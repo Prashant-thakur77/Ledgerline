@@ -1,34 +1,13 @@
 # Blockers
 
-Two open items from Phase 0. The first needs an action only you can take; the second needs a decision only you
-should make. Everything else in Phase 0 passed — see [PHASE0.md](PHASE0.md).
+One open item from Phase 0. Everything else passed — see [PHASE0.md](PHASE0.md).
 
 ---
 
-## 1. No funded Coston2 wallet — blocks every on-chain step
+## ~~1. No funded Coston2 wallet~~ — RESOLVED 2026-08-08
 
-**What is blocked:** submitting attestations to `FdcHub`, deploying `RevenueOracle` and `AdvanceManager`,
-holding FXRP in the treasury. In other words, the on-chain half of Phase 0.1 and all of Phases 1, 2, 4, 6, 7.
-
-**Exact state:**
-
-```
-eth_getBalance 0x5c051991900E6202430d28B26c9D21C7C23ef290 → 0x0
-```
-
-**Why I could not resolve it:** the faucet at `https://faucet.flare.network/coston2` is a browser page (HTTP
-200) with no programmatic endpoint — `/api/faucet`, `/api/v1/faucet` and `/api/claim` all return 404. It needs a
-human in a browser.
-
-**What I need from you — either one:**
-
-- **Preferred:** paste `0x5c051991900E6202430d28B26c9D21C7C23ef290` into the faucet. It dispenses 100 C2FLR,
-  10 USDT0 and 10 FXRP per address per 24 hours, which covers gas *and* the FXRP treasury in one action. The
-  private key is already in `flare/.env` (gitignored) and is a throwaway generated for this project.
-- Or give me a private key you already control that is funded on Coston2, and I will swap it into `.env`.
-
-This is a mechanical unblock, not a technical unknown. The moment it lands I can run the full Web2Json round
-trip and close out Phase 0.1.
+Faucet sent 100 C2FLR, 10 FTestXRP and 10 USDT0 to `0x5c051991900E6202430d28B26c9D21C7C23ef290`. All balances
+confirmed on chain. The full Web2Json round trip then ran and verified a proof on chain — Phase 0.1 is closed.
 
 ---
 

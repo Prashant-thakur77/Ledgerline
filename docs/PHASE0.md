@@ -2,8 +2,10 @@
 
 Run date: 2026-08-08 (UTC). Network: Coston2, chain id 114 (`eth_chainId` → `0x72`, verified).
 
-Status: **2 of 4 checks passed outright, 2 blocked on credentials only a human can supply.**
-See [BLOCKERS.md](BLOCKERS.md) for the two open items.
+Status: **3 of 4 checks passed. Only the Stripe leg (0.2) is open**, and it is blocked on a Stripe account plus
+one design decision — see [BLOCKERS.md](BLOCKERS.md).
+
+The wallet was funded from the faucet on 2026-08-08: 100 C2FLR, 10 FTestXRP, 10 USDT0.
 
 ## Environment
 
@@ -41,8 +43,23 @@ Encodings confirmed by hand (the starter's helper does this, but the values are 
 | verifier endpoint | `{VERIFIER_URL_TESTNET}/verifier/web2/Web2Json/prepareRequest` |
 | DA layer | `https://ctn2-data-availability.flare.network` |
 
-**On-chain submission and proof retrieval: NOT YET RUN** — needs a funded wallet. This is the one remaining
-technical unknown in the whole project, and it is gated purely on gas.
+**On-chain submission, proof retrieval and in-contract verification: PASSED.** The starter's `Web2Json.ts`
+example was run untouched against Coston2 and completed the whole round trip:
+
+| Step | Result |
+|---|---|
+| Attestation submitted to `FdcHub` | voting round **1419928** |
+| Proof retrieved | `{COSTON2_DA_LAYER_URL}/api/v1/fdc/proof-by-request-round-raw` |
+| Merkle proof verified **on chain** | `ContractRegistry.getFdcVerification().verifyWeb2Json(proof)` returned true |
+| Consuming transaction | `0x4a79ab6213299f2276e4d95468f91447a5ccab396ceefa09e6461e1aa5719632` |
+| Decoded and stored | `R2-D2`, 6 films, uid 3, bmi 34 — computed on chain from attested height/mass |
+
+This was the test the brief calls the one that decides whether the project is viable. It passes. The pattern the
+whole product depends on — an off-chain API response reduced by jq, agreed by the network, and proven inside a
+contract before anything is written to storage — is confirmed working on Coston2 as of today.
+
+The response arrives as `proof.data.responseBody.abiEncodedData` and is decoded with `abi.decode` into a struct
+matching the `abiSignature` given at request time. `RevenueOracle` follows exactly this shape.
 
 ### Finding: the attestation request is public, in plaintext
 
@@ -93,12 +110,24 @@ value. This is precisely the "silently wrong" money bug the brief warns about, a
 
 ## 0.4 — FXRP on Coston2
 
-**Not obtained (needs the faucet, which needs a human), but the route is easier than the brief assumed.**
+**PASSED — real FXRP, no mock needed.** Script: [`scripts/ledgerline/phase0-fxrp.ts`](../scripts/ledgerline/phase0-fxrp.ts).
 
-The brief says the faucet no longer hands out FXRP and that FAssets minting or a MockFXRP fallback would be
-needed. As of 2026-08-08 the Coston2 faucet dispenses **100 C2FLR, 10 USDT0 and 10 FXRP per address per 24
-hours** — FXRP directly. So the MockFXRP fallback is very likely unnecessary, which removes an honesty caveat
-that would otherwise have gone in the submission.
+The brief says the faucet no longer hands out FXRP and plans a MockFXRP fallback with an accompanying honesty
+caveat in the submission. Not needed: the faucet dispensed it directly.
 
-10 FXRP is small for demonstrating advances. If the demo needs more, either claim across several addresses or
-mint through FAssets as originally planned. Decide once the treasury sizing is known.
+| Thing | Value |
+|---|---|
+| FAssets `AssetManager` (FXRP) | `0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA` |
+| FXRP token (`assetManager.fAsset()`) | `0x0b6A3645c240605887a5532109323A3E12273dc7` |
+| Symbol | `FTestXRP` |
+| **Decimals** | **6** |
+| Balance held | 10.0 (raw `10000000`) |
+
+**FXRP has 6 decimals, not 18.** Together with XRP/USD also being 6, this is the second decimals trap in the
+money path. A USD→FXRP conversion that assumes 18 decimals is wrong by a factor of 10^12 — it would silently
+send a millionth of a millionth of the intended amount, or revert. Resolve the token's `decimals()` at
+construction and assert it; never hardcode.
+
+10 FXRP is a small treasury. It is enough to demonstrate several advances if the demo uses dollar amounts of a
+few cents to a couple of dollars, which also keeps the numbers readable on video. If more is needed, claim
+across several addresses or mint through FAssets.
