@@ -113,6 +113,54 @@ describe("RevenueOracle", () => {
             expect(history.map((r: any) => r.revenueCents)).to.deep.equal([300_000n, 350_000n, 400_000n]);
         });
 
+        it("records the FDC voting round the figure was proven in", async () => {
+            const { oracle, borrower } = await deploy();
+            const d = dto();
+            const accountId = await oracle.accountIdFor(d.platform, d.accountRef);
+
+            await oracle.connect(borrower).submitAttestation(accountId, proofFor(d));
+
+            expect((await oracle.latestRevenue(accountId)).votingRound).to.equal(1419928n);
+        });
+
+        it("records the merkle root the proof resolves to, so it can be checked against the round", async () => {
+            const { oracle, borrower } = await deploy();
+            const d = dto();
+            const accountId = await oracle.accountIdFor(d.platform, d.accountRef);
+            const proof = proofFor(d);
+
+            await oracle.connect(borrower).submitAttestation(accountId, proof);
+
+            // With no sibling nodes the root is the leaf itself: keccak of the encoded response.
+            const RESPONSE_TYPE =
+                "tuple(bytes32 attestationType,bytes32 sourceId,uint64 votingRound,uint64 lowestUsedTimestamp," +
+                "tuple(string url,string httpMethod,string headers,string queryParams,string body,string postProcessJq,string abiSignature) requestBody," +
+                "tuple(bytes abiEncodedData) responseBody)";
+            const d0 = proof.data;
+            const encoded = coder.encode(
+                [RESPONSE_TYPE],
+                [
+                    [
+                        d0.attestationType,
+                        d0.sourceId,
+                        d0.votingRound,
+                        d0.lowestUsedTimestamp,
+                        [
+                            d0.requestBody.url,
+                            d0.requestBody.httpMethod,
+                            d0.requestBody.headers,
+                            d0.requestBody.queryParams,
+                            d0.requestBody.body,
+                            d0.requestBody.postProcessJq,
+                            d0.requestBody.abiSignature,
+                        ],
+                        [d0.responseBody.abiEncodedData],
+                    ],
+                ]
+            );
+            expect((await oracle.latestRevenue(accountId)).merkleRoot).to.equal(ethers.keccak256(encoded));
+        });
+
         it("distinguishes the same account reference on different platforms", async () => {
             const { oracle } = await deploy();
             expect(await oracle.accountIdFor("stripe", "acct_1"))

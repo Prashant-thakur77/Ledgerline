@@ -3,7 +3,7 @@
 import { ethers } from "hardhat";
 import { getAssetManagerFXRP } from "../utils/getters";
 
-const MANAGER = "0xfcBAe87Bf4861f47A031C16B893d602174Ac162f";
+const MANAGER = "0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66";
 const FXRP = "0x0b6A3645c240605887a5532109323A3E12273dc7";
 
 async function main() {

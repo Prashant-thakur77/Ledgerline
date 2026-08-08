@@ -64,12 +64,19 @@ signed an EVM transaction to receive it, and would not need an EVM wallet at all
 their behalf. The revenue was proven from a Web2 API, underwritten on Flare, and settled on a chain with no
 smart contracts of its own.
 
+> Those five transactions were run against the deployment listed below before `RevenueOracle` was extended to
+> record the FDC voting round and Merkle root on each figure — the data the interface needs to show its work.
+> The contracts were then redeployed and the revenue re-attested at
+> [`0xede1d3f8…`](https://coston2-explorer.flare.network/tx/0xede1d3f8bcb4292c928a59f6f4fb45aac43c76e5b9d0ac8a321b5004dfeb33b6):
+> **$3,916.78**, FDC round **1,419,988**, Merkle root `0x4db0a6fe…39b2`. The five above remain exactly what
+> happened; they simply predate that field.
+
 ## Deployed on Coston2 (chain id 114)
 
 | Contract | Address |
 |---|---|
-| `RevenueOracle` | [`0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8`](https://coston2-explorer.flare.network/address/0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8#code) |
-| `AdvanceManager` | [`0xfcBAe87Bf4861f47A031C16B893d602174Ac162f`](https://coston2-explorer.flare.network/address/0xfcBAe87Bf4861f47A031C16B893d602174Ac162f#code) |
+| `RevenueOracle` | [`0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code) |
+| `AdvanceManager` | [`0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66`](https://coston2-explorer.flare.network/address/0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66#code) |
 | FAssets `AssetManager` (FXRP) | [`0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`](https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA) |
 | FXRP (`FTestXRP`) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |
 
@@ -80,10 +87,10 @@ Both contracts are source-verified on the explorer. Full deployment notes in [do
 ```bash
 cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
 yarn install
-yarn hardhat test             # 44 tests
+yarn hardhat test             # 46 tests
 
 # fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
-yarn hardhat run scripts/ledgerline/deploy-v2.ts --network coston2
+yarn hardhat run scripts/ledgerline/deploy.ts --network coston2
 
 # prove a period of revenue, then borrow against it
 REVENUE_SOURCE=stripe ACCOUNT_REF=acct_… yarn hardhat run scripts/ledgerline/attest-revenue.ts --network coston2
@@ -173,6 +180,37 @@ trusted intermediary reading the API, and settling it in an asset that had no sm
 until FAssets.
 
 **The demo runs on Stripe test mode.** The API responses are real; the money behind them is not.
+
+## The flaw in this design, and what fixes it
+
+The proof line is what makes this product trustworthy. It is also what makes it unusable for a real business.
+
+Publishing a company's monthly revenue on a public chain, permanently, is something almost no company will do.
+Competitors read it. Customers read it. Anyone negotiating with them reads it. At the scale where an advance is
+worth having, the transparency that earns the trust is exactly the thing that kills adoption. That is not a
+small caveat — it is the difference between a demo and a business.
+
+**Flare Confidential Compute answers it without giving up the proof.** The attested revenue goes into a TEE,
+the underwriting runs inside it, and only the decision comes out: an advance limit, carrying an attestation
+that the computation ran correctly on genuine attested data. Nobody sees the underlying figures — not
+competitors, not us. The borrower gets credit; the numbers stay private.
+
+For the interface it is a small change with a large effect. The proof line stays exactly where it is, in the
+same colour, in the same position. It just names the computation instead of the revenue:
+
+```
+verified privately · underwriting run in tee · attestation 0x4c19…8de2 ↗
+```
+
+The figure above it becomes the limit rather than the earnings. A judge reading that line understands
+immediately that the number was computed on data they cannot see and still cannot be faked.
+
+**This is deliberately not built.** The Confidential Compute stack is difficult right now — teams in the
+hackathon have lost days to a redeploy that wiped extension registrations, to indexer credentials, to Docker
+image hash matching across TEE machines, and to version mismatches between `tee-node` and `tee-proxy`. Taking
+that risk with a complete, working, deployed product five days from the deadline would be a bad trade. The
+honest move is to name the weakness, show that the fix is understood and specified, and ship the thing that
+works.
 
 ## Roadmap
 

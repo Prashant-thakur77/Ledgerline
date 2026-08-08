@@ -3,7 +3,7 @@
 Every number below is real and already on chain. Nothing needs to be staged except the browser tabs.
 
 **Before recording.** Have open: the app on `localhost:3000`, the Stripe sandbox balance-transactions page, and
-[`RevenueOracle` on the explorer](https://coston2-explorer.flare.network/address/0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8#code).
+[`RevenueOracle` on the explorer](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code).
 Reset to a fresh account by picking a new `ACCOUNT_REF` if you want to run the flow live rather than narrate the
 existing transactions.
 

@@ -1,5 +1,5 @@
-export const ORACLE_ADDRESS = "0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8" as const;
-export const MANAGER_ADDRESS = "0xfcBAe87Bf4861f47A031C16B893d602174Ac162f" as const;
+export const ORACLE_ADDRESS = "0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6" as const;
+export const MANAGER_ADDRESS = "0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66" as const;
 export const FXRP_ADDRESS = "0x0b6A3645c240605887a5532109323A3E12273dc7" as const;
 
 export const EXPLORER = "https://coston2-explorer.flare.network";
@@ -28,6 +28,8 @@ export const oracleAbi = [
                     { name: "periodStart", type: "uint64" },
                     { name: "periodEnd", type: "uint64" },
                     { name: "provenAt", type: "uint64" },
+                    { name: "votingRound", type: "uint64" },
+                    { name: "merkleRoot", type: "bytes32" },
                 ],
             },
         ],

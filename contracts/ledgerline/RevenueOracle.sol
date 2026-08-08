@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { ContractRegistry } from "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
 import { IWeb2Json } from "@flarenetwork/flare-periphery-contracts/coston2/IWeb2Json.sol";
+import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /**
  * @title RevenueOracle
@@ -26,6 +27,11 @@ contract RevenueOracle {
         uint64 periodStart;
         uint64 periodEnd;
         uint64 provenAt;
+        /// @notice The FDC voting round that agreed this figure.
+        uint64 votingRound;
+        /// @notice The Merkle root the proof resolves to — checkable against what the Relay published
+        /// for `votingRound`, so anyone can confirm this record independently of us.
+        bytes32 merkleRoot;
     }
 
     /// @notice First wallet to prove an account owns it. Only it may attest for that account afterwards.
@@ -42,7 +48,9 @@ contract RevenueOracle {
         address indexed owner,
         uint256 revenueCents,
         uint64 periodStart,
-        uint64 periodEnd
+        uint64 periodEnd,
+        uint64 votingRound,
+        bytes32 merkleRoot
     );
 
     error InvalidProof();
@@ -97,11 +105,22 @@ contract RevenueOracle {
                 revenueCents: dto.revenueCents,
                 periodStart: uint64(dto.periodStart),
                 periodEnd: uint64(dto.periodEnd),
-                provenAt: uint64(block.timestamp)
+                provenAt: uint64(block.timestamp),
+                votingRound: proof.data.votingRound,
+                merkleRoot: MerkleProof.processProof(proof.merkleProof, keccak256(abi.encode(proof.data)))
             })
         );
 
-        emit RevenueProven(accountId, owner, dto.revenueCents, uint64(dto.periodStart), uint64(dto.periodEnd));
+        RevenueRecord storage stored = records[records.length - 1];
+        emit RevenueProven(
+            accountId,
+            owner,
+            stored.revenueCents,
+            stored.periodStart,
+            stored.periodEnd,
+            stored.votingRound,
+            stored.merkleRoot
+        );
     }
 
     function latestRevenue(bytes32 accountId) external view returns (RevenueRecord memory) {
