@@ -1,7 +1,9 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomiclabs/hardhat-web3";
-import "@tenderly/hardhat-tenderly";
+// Disabled: its ethers extender wraps deployed contracts in a proxy that swallows the dynamic
+// method lookup, so `contract.myFunction()` resolves to undefined. Nothing here uses Tenderly.
+// import "@tenderly/hardhat-tenderly";
 require("@nomiclabs/hardhat-truffle5");
 // import { vars } from "hardhat/config";
 const { vars } = require("hardhat/config");
