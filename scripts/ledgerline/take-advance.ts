@@ -5,7 +5,7 @@
 import { ethers } from "hardhat";
 
 const ORACLE = process.env.ORACLE_ADDRESS ?? "0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8";
-const MANAGER = process.env.MANAGER_ADDRESS ?? "0x5774E51335277893c5f177bb6735b4CF2fE76A63";
+const MANAGER = process.env.MANAGER_ADDRESS ?? "0xfcBAe87Bf4861f47A031C16B893d602174Ac162f";
 const FXRP = "0x0b6A3645c240605887a5532109323A3E12273dc7";
 
 const PLATFORM = process.env.PLATFORM ?? "demo";

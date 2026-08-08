@@ -84,7 +84,23 @@ A new period is attested — **$4.55** — and the repayment runs.
 Show the balance fall: **$2.10 → $1.19**, with **0.873727 FXRP** moved at the rate current *at repayment*, not
 at origination.
 
-### 3:55 — What is honest about it
+### 3:50 — The part nobody else will have
+
+Show the XRPL account page, then run it — or narrate the transaction if you're short on time.
+
+> This advance is going somewhere different. Instead of sending FXRP, the contract redeems it through FAssets,
+> and a FAssets agent pays real XRP to the borrower's own XRP Ledger account.
+
+Show the balance change: **100 → 109.95 XRP**, paid by agent `r4GHJwG…` within about fifteen seconds.
+
+> The borrower never held FXRP. They never signed an EVM transaction to receive this. The revenue was proven
+> from a Web2 API, the loan was underwritten on Flare, and the money arrived on a chain that cannot run any of
+> this logic itself. That is both halves of interoperability doing real work — data in from Web2, value out to
+> the XRP Ledger.
+
+The debt is still recorded on Flare in dollars: **$10.92**.
+
+### 4:10 — What is honest about it
 
 Do not skip this.
 
@@ -96,7 +112,7 @@ Do not skip this.
 > confidentiality, not trust — the number is still proven by the network, not vouched for by us. It's a
 > read-only key scoped to two endpoints, and the production answer is per-borrower scoping.
 
-### 4:20 — Close
+### 4:35 — Close
 
 > Three pieces of Flare, each load-bearing. FDC Web2Json is the underwriting — without it there is no way to
 > know anyone's revenue and the product cannot exist. FTSOv2 makes the obligation a dollar obligation instead
@@ -106,7 +122,7 @@ Do not skip this.
 
 ---
 
-## The four transactions, if you narrate rather than run
+## The six transactions, if you narrate rather than run
 
 | Step | Transaction |
 |---|---|
@@ -114,6 +130,8 @@ Do not skip this.
 | Advance issued, 1.918796 FXRP | `0x7996ce9cc7e91c2f81bdae01694e56798fa932ad4b8b5468ce43de5333e2e585` |
 | New period proven, $4.55 | `0x768f0d23dd981277d5617fc978d4716f15e0bc39f0dc7b5117270bcb22c38515` |
 | Repaid from revenue, $2.10 → $1.19 | `0x1331a9b5f83de8d07f77df33eaa56bc599b85127c6fb9511a24407b38f86dd82` |
+| Advance redeemed to XRPL (Flare side) | `0x96ec23d1a6a66fae6a71d3a8c67bd9d5b158d706d04de49d36b3d7ba198922ff` |
+| The XRP actually arriving (XRPL side) | `784C8E73E1417C2600F7E6473FEE3CB43DEABFCDA008192789AB81F3BFD41534` |
 
 ## Pacing note
 

@@ -9,6 +9,17 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import { ContractRegistry } from "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
 import { RevenueOracle } from "./RevenueOracle.sol";
 
+/// @dev The slice of FAssets' AssetManager this contract needs: burn FXRP and have an agent pay XRP out.
+interface IFAssetRedeemer {
+    function lotSize() external view returns (uint256 _lotSizeUBA);
+
+    function redeem(
+        uint256 _lots,
+        string memory _redeemerUnderlyingAddressString,
+        address payable _executor
+    ) external payable returns (uint256 _redeemedAmountUBA);
+}
+
 /**
  * @title AdvanceManager
  * @notice Underwrites an FXRP advance against revenue proven by RevenueOracle, and collects repayment.
@@ -59,6 +70,9 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
     uint256 public treasuryBalance;
 
+    /// @notice FAssets AssetManager for FXRP. Optional: unset simply means the XRPL leg is unavailable.
+    IFAssetRedeemer public assetManager;
+
     mapping(bytes32 => Advance) private _advances;
 
     event TreasuryDeposited(uint256 amount);
@@ -91,6 +105,14 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         bool automatic
     );
     event AdvanceClosed(bytes32 indexed accountId);
+    event AdvanceDisbursedToXrpl(
+        bytes32 indexed accountId,
+        address indexed borrower,
+        uint256 lots,
+        uint256 fxrpRedeemed,
+        string xrplAddress
+    );
+    event AssetManagerSet(address assetManager);
     event MarkedDelinquent(bytes32 indexed accountId, uint256 outstandingCents);
 
     error NoRevenueProven();
@@ -104,6 +126,8 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     error InvalidAmount();
     error PeriodAlreadyApplied();
     error GracePeriodNotElapsed();
+    error InvalidXrplAddress();
+    error XrplDisbursementUnavailable();
 
     constructor(address oracleAddress, address fxrpAddress) Ownable(msg.sender) {
         oracle = RevenueOracle(oracleAddress);
@@ -138,13 +162,74 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
     // ---------------------------------------------------------------- advances
 
+    /// @notice Take an advance in FXRP, on Flare.
     function requestAdvance(bytes32 accountId, uint256 usdCents) external nonReentrant {
         if (usdCents == 0) revert InvalidAmount();
 
+        (uint256 price, int8 priceDecimals) = _xrpUsd();
+        if (price == 0) revert InvalidPrice();
+
+        uint256 fxrpAmount = usdCentsToFxrp(usdCents, price, priceDecimals);
+        if (fxrpAmount == 0) revert InvalidAmount();
+
+        address borrower = _openAdvance(accountId, usdCents, fxrpAmount, price, priceDecimals);
+
+        treasuryBalance -= fxrpAmount;
+        fxrp.safeTransfer(borrower, fxrpAmount);
+    }
+
+    /**
+     * @notice Take an advance and receive real XRP on the XRP Ledger, never touching FXRP.
+     *
+     * The FXRP is redeemed through FAssets and an agent pays the borrower's XRPL address directly, so a
+     * borrower can be funded without ever holding an EVM asset or, in principle, an EVM wallet.
+     *
+     * Denominated in lots rather than dollars because FAssets redeems whole lots only — 10 XRP on Coston2.
+     * The dollar obligation is then computed from what was actually redeemed, at the FTSO rate.
+     */
+    function requestAdvanceToXrpl(
+        bytes32 accountId,
+        uint256 lots,
+        string calldata xrplAddress
+    ) external nonReentrant {
+        if (lots == 0) revert InvalidAmount();
+        if (bytes(xrplAddress).length == 0) revert InvalidXrplAddress();
+
+        IFAssetRedeemer redeemer = assetManager;
+        if (address(redeemer) == address(0)) revert XrplDisbursementUnavailable();
+
+        uint256 fxrpAmount = lots * redeemer.lotSize();
+
+        (uint256 price, int8 priceDecimals) = _xrpUsd();
+        if (price == 0) revert InvalidPrice();
+
+        uint256 usdCents = fxrpToUsdCents(fxrpAmount, price, priceDecimals);
+        if (usdCents == 0) revert InvalidAmount();
+
+        address borrower = _openAdvance(accountId, usdCents, fxrpAmount, price, priceDecimals);
+
+        treasuryBalance -= fxrpAmount;
+        fxrp.forceApprove(address(redeemer), fxrpAmount);
+        redeemer.redeem(lots, xrplAddress, payable(address(0)));
+
+        emit AdvanceDisbursedToXrpl(accountId, borrower, lots, fxrpAmount, xrplAddress);
+    }
+
+    /**
+     * @dev Everything both legs share: underwrite, check, and record. Leaves the caller to move the value,
+     * so the effects are all written before anything external is touched.
+     */
+    function _openAdvance(
+        bytes32 accountId,
+        uint256 usdCents,
+        uint256 fxrpAmount,
+        uint256 price,
+        int8 priceDecimals
+    ) internal returns (address borrower) {
         (uint256 avg, uint8 periodsUsed) = _averageRevenue(accountId);
         if (periodsUsed == 0) revert NoRevenueProven();
 
-        address borrower = oracle.accountOwner(accountId);
+        borrower = oracle.accountOwner(accountId);
         if (borrower != msg.sender) revert NotAccountOwner(borrower, msg.sender);
 
         Advance storage advance = _advances[accountId];
@@ -153,17 +238,10 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
         uint256 limit = advanceLimitCents(accountId);
         if (usdCents > limit) revert ExceedsLimit(limit, usdCents);
-
-        (uint256 price, int8 priceDecimals) = _xrpUsd();
-        if (price == 0) revert InvalidPrice();
-
-        uint256 fxrpAmount = usdCentsToFxrp(usdCents, price, priceDecimals);
-        if (fxrpAmount == 0) revert InvalidAmount();
         if (fxrpAmount > treasuryBalance) revert InsufficientTreasury(treasuryBalance, fxrpAmount);
 
         uint256 fee = (usdCents * feeBps) / 10_000;
 
-        // Effects before the transfer.
         advance.principalCents = usdCents;
         advance.feeCents = fee;
         advance.outstandingCents = usdCents + fee;
@@ -177,9 +255,6 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         advance.factorBps = factorBps;
         advance.xrpUsdPrice = price;
         advance.priceDecimals = priceDecimals;
-
-        treasuryBalance -= fxrpAmount;
-        fxrp.safeTransfer(borrower, fxrpAmount);
 
         emit Underwritten(accountId, avg, periodsUsed, advance.factorBps, limit);
         emit AdvanceIssued(
@@ -285,6 +360,24 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         uint256 priceScale = 10 ** uint256(uint8(priceDecimals));
         uint256 tokenScale = 10 ** uint256(fxrpDecimals);
         return (usdCents * priceScale * tokenScale) / (100 * price);
+    }
+
+    /// @notice The inverse of usdCentsToFxrp: what a quantity of FXRP is worth in US cents, truncated.
+    function fxrpToUsdCents(uint256 fxrpRaw, uint256 price, int8 priceDecimals) public view returns (uint256) {
+        if (price == 0) revert InvalidPrice();
+        uint256 priceScale = 10 ** uint256(uint8(priceDecimals));
+        uint256 tokenScale = 10 ** uint256(fxrpDecimals);
+        return (fxrpRaw * price * 100) / (priceScale * tokenScale);
+    }
+
+    function setAssetManager(address newAssetManager) external onlyOwner {
+        assetManager = IFAssetRedeemer(newAssetManager);
+        emit AssetManagerSet(newAssetManager);
+    }
+
+    /// @notice Lot size in FXRP base units, or 0 when the XRPL leg is unavailable.
+    function lotSize() external view returns (uint256) {
+        return address(assetManager) == address(0) ? 0 : assetManager.lotSize();
     }
 
     function advanceOf(bytes32 accountId) external view returns (Advance memory) {

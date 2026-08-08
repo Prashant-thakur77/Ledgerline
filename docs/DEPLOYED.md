@@ -6,7 +6,9 @@ the explorer.
 | Contract | Address |
 |---|---|
 | `RevenueOracle` | [`0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8`](https://coston2-explorer.flare.network/address/0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8#code) |
-| `AdvanceManager` | [`0x5774E51335277893c5f177bb6735b4CF2fE76A63`](https://coston2-explorer.flare.network/address/0x5774E51335277893c5f177bb6735b4CF2fE76A63#code) |
+| `AdvanceManager` (v2, with the XRPL leg) | [`0xfcBAe87Bf4861f47A031C16B893d602174Ac162f`](https://coston2-explorer.flare.network/address/0xfcBAe87Bf4861f47A031C16B893d602174Ac162f#code) |
+| `AdvanceManager` (v1, superseded) | [`0x5774E51335277893c5f177bb6735b4CF2fE76A63`](https://coston2-explorer.flare.network/address/0x5774E51335277893c5f177bb6735b4CF2fE76A63#code) |
+| FAssets `AssetManager` (FXRP) | [`0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`](https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA) |
 | FXRP (`FTestXRP`, 6 decimals) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |
 
 Flare infrastructure the contracts reach through `ContractRegistry`
@@ -56,6 +58,32 @@ Worth noting for the demo: the script quoted 1.918772 FXRP from an `eth_call` a 
 and the transaction sent 1.917837 at a rate of $1.042841 rather than the quoted $1.042333. The feed moved
 between the quote and the execution. That is FTSOv2 being live rather than cached, and the dollar obligation
 was unaffected by it — which is the entire argument for denominating in dollars.
+
+## The XRPL leg
+
+`requestAdvanceToXrpl` redeems the advance through FAssets instead of transferring FXRP, so a FAssets agent
+pays the borrower's XRP Ledger account directly.
+
+| | |
+|---|---|
+| Flare tx | [`0x96ec23d1…`](https://coston2-explorer.flare.network/tx/0x96ec23d1a6a66fae6a71d3a8c67bd9d5b158d706d04de49d36b3d7ba198922ff) |
+| XRPL payment | [`784C8E73…`](https://testnet.xrpl.org/transactions/784C8E73E1417C2600F7E6473FEE3CB43DEABFCDA008192789AB81F3BFD41534) |
+| Paid by agent | `r4GHJwGSaGmJy9BBXS9osFXqRjqdSm7v83` |
+| Destination | `rpcBsvdaL4eCkK64nNsQB1PQf4hm2Dq3Sc`, balance 100 → **109.95 XRP** |
+| Debt recorded | $10.92 ($10.40 at $1.040793, plus a $0.52 fee) |
+
+The agent paid within about fifteen seconds. It kept 0.05 XRP as the redemption fee, which is why 10 lots-worth
+arrived as 9.95.
+
+### Two things that will bite anyone reproducing this
+
+**Redemption is in whole lots, 10 XRP each.** There is no way to redeem $2. `requestAdvanceToXrpl` therefore
+takes a lot count rather than a dollar amount, and computes the dollar debt from what was actually redeemed.
+
+**`eth_estimateGas` under-estimates the redemption.** The first attempt reverted having consumed exactly its
+estimate — redemption walks the redemption ticket queue, and the estimate does not account for it. The script
+passes an explicit `gasLimit` of 6,000,000. A simulation with `staticCall` succeeds either way, so this failure
+looks mysterious until you notice `gasUsed` equals the limit.
 
 ## Redeploying
 

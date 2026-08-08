@@ -40,6 +40,7 @@ Not a mock. These are transactions on Coston2 from a live Stripe API call.
 | 2. Advance issued — **1.918796 FXRP** sent for a **$2.10** obligation | [`0x7996ce9c…`](https://coston2-explorer.flare.network/tx/0x7996ce9cc7e91c2f81bdae01694e56798fa932ad4b8b5468ce43de5333e2e585) |
 | 3. A new period attested — **$4.55** | [`0x768f0d23…`](https://coston2-explorer.flare.network/tx/0x768f0d23dd981277d5617fc978d4716f15e0bc39f0dc7b5117270bcb22c38515) |
 | 4. It repaid itself — 20% taken, **0.873727 FXRP**, debt **$2.10 → $1.19** | [`0x1331a9b5…`](https://coston2-explorer.flare.network/tx/0x1331a9b5f83de8d07f77df33eaa56bc599b85127c6fb9511a24407b38f86dd82) |
+| 5. An advance paid out as **real XRP on the XRP Ledger** | [`0x96ec23d1…`](https://coston2-explorer.flare.network/tx/0x96ec23d1a6a66fae6a71d3a8c67bd9d5b158d706d04de49d36b3d7ba198922ff) |
 
 The Stripe sandbox took three charges totalling $4,030. Stripe's fees brought the net to $3,912.23, and that
 net is the figure underwritten, because it is the money the business actually keeps.
@@ -48,12 +49,28 @@ Step 4 is the mechanism the whole product turns on: a newly proven period of rev
 anyone deciding to pay. The dollar figure fell by exactly the agreed 20% of that period's revenue, and the FXRP
 that moved was priced at the rate current at that moment rather than the rate at origination.
 
+**Step 5 is the one worth pausing on.** `requestAdvanceToXrpl` redeemed the FXRP through FAssets rather than
+transferring it, and a FAssets agent paid the borrower's XRP Ledger address directly:
+
+| | |
+|---|---|
+| XRPL payment | [`784C8E73…`](https://testnet.xrpl.org/transactions/784C8E73E1417C2600F7E6473FEE3CB43DEABFCDA008192789AB81F3BFD41534) |
+| Paid by agent | `r4GHJwGSaGmJy9BBXS9osFXqRjqdSm7v83` |
+| Received | **9.95 XRP** (10 XRP less the agent's redemption fee), balance 100 → 109.95 |
+| Debt recorded on Flare | **$10.92** — $10.40 principal at $1.040793, plus fee |
+
+The borrower ends up holding **real XRP in an ordinary XRP Ledger account**. They never held FXRP, never
+signed an EVM transaction to receive it, and would not need an EVM wallet at all if the request were placed on
+their behalf. The revenue was proven from a Web2 API, underwritten on Flare, and settled on a chain with no
+smart contracts of its own.
+
 ## Deployed on Coston2 (chain id 114)
 
 | Contract | Address |
 |---|---|
 | `RevenueOracle` | [`0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8`](https://coston2-explorer.flare.network/address/0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8#code) |
-| `AdvanceManager` | [`0x5774E51335277893c5f177bb6735b4CF2fE76A63`](https://coston2-explorer.flare.network/address/0x5774E51335277893c5f177bb6735b4CF2fE76A63#code) |
+| `AdvanceManager` | [`0xfcBAe87Bf4861f47A031C16B893d602174Ac162f`](https://coston2-explorer.flare.network/address/0xfcBAe87Bf4861f47A031C16B893d602174Ac162f#code) |
+| FAssets `AssetManager` (FXRP) | [`0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`](https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA) |
 | FXRP (`FTestXRP`) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |
 
 Both contracts are source-verified on the explorer. Full deployment notes in [docs/DEPLOYED.md](docs/DEPLOYED.md).
@@ -63,14 +80,20 @@ Both contracts are source-verified on the explorer. Full deployment notes in [do
 ```bash
 cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
 yarn install
-yarn hardhat test             # 34 tests
+yarn hardhat test             # 44 tests
 
 # fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
-yarn hardhat run scripts/ledgerline/deploy.ts --network coston2
+yarn hardhat run scripts/ledgerline/deploy-v2.ts --network coston2
 
 # prove a period of revenue, then borrow against it
 REVENUE_SOURCE=stripe ACCOUNT_REF=acct_… yarn hardhat run scripts/ledgerline/attest-revenue.ts --network coston2
 PLATFORM=stripe ACCOUNT_REF=acct_… USD_CENTS=200 yarn hardhat run scripts/ledgerline/take-advance.ts --network coston2
+
+# or take it as real XRP on the XRP Ledger instead — needs whole lots, 10 XRP each
+XRPL_ADDRESS=r… LOTS=1 yarn hardhat run scripts/ledgerline/advance-to-xrpl.ts --network coston2
+
+# a newly attested period repays part of the advance
+yarn hardhat run scripts/ledgerline/apply-repayment.ts --network coston2
 
 cd web && npm install && npm run dev      # the interface, on :3000
 ```
@@ -96,14 +119,15 @@ equivalent of $3,000 after a price move — turning a working capital product in
 the borrower never asked to hold. There is a test that moves XRP 3x and asserts the dollar obligation does not
 change.
 
-**FAssets is the money that moves.** The advance is disbursed in FXRP, which is XRP made usable by smart
-contracts. **Without it there is no XRP-denominated asset a contract can hold or transfer at all** — XRP has no
-native smart contract capability, so the disbursement leg would have to be some other chain's asset and the
-product would stop being about XRP.
+**FAssets is the money that moves, in both directions.** The advance is disbursed in FXRP, which is XRP made
+usable by smart contracts, and `requestAdvanceToXrpl` redeems that FXRP back to **real XRP paid to the
+borrower's XRP Ledger account** by a FAssets agent. **Without it there is no XRP-denominated asset a contract
+can hold at all** — XRP has no native smart contract capability — and without redemption the borrower would be
+stuck holding a wrapped asset on a chain they never asked to use.
 
-Honestly stated: this build **uses** FXRP as the disbursed asset but does not yet **mint or redeem** through
-the FAssets flow. That is the first item on the roadmap, and it is the difference between using the asset and
-using the bridge.
+This is what makes the interoperability claim complete rather than merely defensible: data crosses from Web2
+into Flare's EVM state via FDC, and value crosses from Flare back out to the XRP Ledger via FAssets. The
+borrower's side of the transaction happens entirely on a chain that cannot run any of this logic itself.
 
 ## What was built during the hackathon
 
@@ -152,14 +176,17 @@ until FAssets.
 
 ## Roadmap
 
-1. **The XRPL leg.** Redeem FXRP through FAssets so the borrower receives real XRP in the wallet they already
-   use, and accept repayment as a plain XRP payment proven by FDC's Payment attestation. This removes the EVM
-   wallet requirement entirely — the borrower would never need one. Scoped and understood; cut from this build
-   for time rather than for difficulty.
-2. **A second platform.** Shopify or YouTube. The oracle already takes `platform` as a field and `accountRef`
+1. **Repayment from the XRP Ledger.** Disbursement to XRPL is built; the return leg is not. The borrower would
+   send a plain XRP payment with the advance id in the memo, and FDC's **Payment** attestation would prove it
+   on Flare and reduce the obligation — a second FDC attestation type, and the last step needed for a borrower
+   who never touches an EVM wallet in either direction.
+2. **Advances below one lot on the XRPL leg.** FAssets redeems whole lots only, 10 XRP on Coston2, so the
+   smallest XRPL-settled advance is about $10. Smaller advances work on the FXRP leg. Batching or a float
+   would close the gap.
+3. **A second platform.** Shopify or YouTube. The oracle already takes `platform` as a field and `accountRef`
    as opaque, so this is an entry in `revenue-sources.ts` and no contract change.
-3. **A lender side.** The treasury is a single owner-funded pool today. Real capital needs LP shares, a yield
+4. **A lender side.** The treasury is a single owner-funded pool today. Real capital needs LP shares, a yield
    split and default accounting.
-4. **Underwriting that uses the trend.** The full history is stored and currently only averaged. Growth,
+5. **Underwriting that uses the trend.** The full history is stored and currently only averaged. Growth,
    volatility and seasonality are all visible in it.
-5. **Per-borrower key scoping**, so the published key reads one account's aggregate and nothing else.
+6. **Per-borrower key scoping**, so the published key reads one account's aggregate and nothing else.
