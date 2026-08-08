@@ -36,11 +36,17 @@ Not a mock. These are transactions on Coston2 from a live Stripe API call.
 
 | | |
 |---|---|
-| Revenue attested — **$3,912.23** read from Stripe, proven on chain | [`0x8bea3e15…`](https://coston2-explorer.flare.network/tx/0x8bea3e154e9bbc70dde5fd32bad90a54aa52a2e68205600e431b4900f77d88af) |
-| Advance issued — **1.918796 FXRP** sent for a **$2.10** obligation | [`0x7996ce9c…`](https://coston2-explorer.flare.network/tx/0x7996ce9cc7e91c2f81bdae01694e56798fa932ad4b8b5468ce43de5333e2e585) |
+| 1. Revenue attested — **$3,912.23** read from Stripe, proven on chain | [`0x8bea3e15…`](https://coston2-explorer.flare.network/tx/0x8bea3e154e9bbc70dde5fd32bad90a54aa52a2e68205600e431b4900f77d88af) |
+| 2. Advance issued — **1.918796 FXRP** sent for a **$2.10** obligation | [`0x7996ce9c…`](https://coston2-explorer.flare.network/tx/0x7996ce9cc7e91c2f81bdae01694e56798fa932ad4b8b5468ce43de5333e2e585) |
+| 3. A new period attested — **$4.55** | [`0x768f0d23…`](https://coston2-explorer.flare.network/tx/0x768f0d23dd981277d5617fc978d4716f15e0bc39f0dc7b5117270bcb22c38515) |
+| 4. It repaid itself — 20% taken, **0.873727 FXRP**, debt **$2.10 → $1.19** | [`0x1331a9b5…`](https://coston2-explorer.flare.network/tx/0x1331a9b5f83de8d07f77df33eaa56bc599b85127c6fb9511a24407b38f86dd82) |
 
 The Stripe sandbox took three charges totalling $4,030. Stripe's fees brought the net to $3,912.23, and that
 net is the figure underwritten, because it is the money the business actually keeps.
+
+Step 4 is the mechanism the whole product turns on: a newly proven period of revenue reduced the debt without
+anyone deciding to pay. The dollar figure fell by exactly the agreed 20% of that period's revenue, and the FXRP
+that moved was priced at the rate current at that moment rather than the rate at origination.
 
 ## Deployed on Coston2 (chain id 114)
 
@@ -134,9 +140,9 @@ answer is per-borrower keys scoped to their own account. See [docs/BLOCKERS.md](
 tests covering one, three and five proven periods, but a sandbox opened today cannot have three months of
 history. On a real account this is not a limitation; in this demo it is.
 
-**Revenue-triggered repayment is tested but has not been run on Coston2.** `applyRevenueRepayment` has unit
-tests, including one asserting the same period cannot be taken twice, but demonstrating it on chain needs a
-second attested period, which needs a second day of Stripe data.
+**The demo's period boundaries are artificial.** A sandbox opened today has minutes of history, not months, so
+the two attested periods are minutes apart rather than a month apart. The contract does not care — a period is
+whatever the attestation says it is — but nobody should read the demo's timestamps as realistic.
 
 **Revenue based financing is not a new idea and this does not claim to be.** What is new is doing it without a
 trusted intermediary reading the API, and settling it in an asset that had no smart contract capability at all
