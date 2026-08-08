@@ -22,6 +22,9 @@ export default function Page() {
     const { connect, connectors, isPending } = useConnect();
     const { disconnect } = useDisconnect();
     const [amount, setAmount] = useState("2.00");
+    const [leg, setLeg] = useState<"fxrp" | "xrpl">("fxrp");
+    const [xrplAddress, setXrplAddress] = useState("");
+    const [lots, setLots] = useState("1");
 
     const { data: accountId } = useReadContract({
         address: ORACLE_ADDRESS,
@@ -74,6 +77,16 @@ export default function Page() {
         functionName: "usdCentsToFxrp",
         args: [cents, xrpUsd!, priceDecimals!],
         query: { enabled: Boolean(xrpUsd && cents > 0n) },
+    });
+
+    const { data: lot } = useReadContract({ address: MANAGER_ADDRESS, abi: managerAbi, functionName: "lotSize" });
+    const lotsBn = BigInt(parseInt(lots || "0", 10) || 0);
+    const { data: xrplCents } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "fxrpToUsdCents",
+        args: [(lot ?? 0n) * lotsBn, xrpUsd!, priceDecimals!],
+        query: { enabled: Boolean(lot && xrpUsd && lotsBn > 0n) },
     });
 
     const { writeContract, isPending: isWriting, data: txHash } = useWriteContract();
@@ -165,16 +178,68 @@ export default function Page() {
                     <h2>Take an advance</h2>
                     <div className="panel">
                         <div className="row">
-                            <span>Amount in US dollars</span>
-                            <input value={amount} onChange={(e) => setAmount(e.target.value)} />
+                            <span>Where should the money go?</span>
+                            <span>
+                                <button
+                                    onClick={() => setLeg("fxrp")}
+                                    style={{ opacity: leg === "fxrp" ? 1 : 0.4, marginRight: 8 }}
+                                >
+                                    FXRP on Flare
+                                </button>
+                                <button onClick={() => setLeg("xrpl")} style={{ opacity: leg === "xrpl" ? 1 : 0.4 }}>
+                                    XRP on the XRP Ledger
+                                </button>
+                            </span>
                         </div>
+                        {leg === "xrpl" && (
+                            <p className="note">
+                                The FXRP is redeemed through FAssets and an agent pays your XRP Ledger account
+                                directly. You never hold FXRP. FAssets redeems whole lots only —{" "}
+                                {lot ? fxrp(lot) : "10"} XRP each — so this leg has a floor of about $10.
+                            </p>
+                        )}
+                        {leg === "fxrp" ? (
+                            <div className="row">
+                                <span>Amount in US dollars</span>
+                                <input value={amount} onChange={(e) => setAmount(e.target.value)} />
+                            </div>
+                        ) : (
+                            <>
+                                <div className="row">
+                                    <span>Lots ({lot ? fxrp(lot) : "10"} XRP each)</span>
+                                    <input value={lots} onChange={(e) => setLots(e.target.value)} />
+                                </div>
+                                <div className="row">
+                                    <span>Your XRP Ledger address</span>
+                                    <input
+                                        value={xrplAddress}
+                                        onChange={(e) => setXrplAddress(e.target.value)}
+                                        placeholder="r…"
+                                        style={{ width: 260 }}
+                                        className="mono"
+                                    />
+                                </div>
+                                <div className="row">
+                                    <span>Dollar debt this creates</span>
+                                    <span>{xrplCents ? usd(xrplCents) : "…"}</span>
+                                </div>
+                            </>
+                        )}
                         <div className="row">
                             <span>XRP/USD, live from FTSOv2</span>
                             <span>{xrpUsd ? price(xrpUsd, Number(priceDecimals)) : "…"}</span>
                         </div>
                         <div className="row">
-                            <span>FXRP you would receive</span>
-                            <span>{quoted ? fxrp(quoted) : "…"}</span>
+                            <span>{leg === "fxrp" ? "FXRP you would receive" : "XRP that will reach your XRPL account"}</span>
+                            <span>
+                                {leg === "fxrp"
+                                    ? quoted
+                                        ? fxrp(quoted)
+                                        : "…"
+                                    : lot
+                                      ? `${fxrp(lot * lotsBn)} less the agent's fee`
+                                      : "…"}
+                            </span>
                         </div>
                         <div className="row">
                             <span>Fee</span>
@@ -182,20 +247,40 @@ export default function Page() {
                         </div>
                         <div style={{ marginTop: 16 }}>
                             <button
-                                disabled={isWriting || !accountId || cents === 0n || cents > (limit ?? 0n)}
+                                disabled={
+                                    isWriting ||
+                                    !accountId ||
+                                    (leg === "fxrp"
+                                        ? cents === 0n || cents > (limit ?? 0n)
+                                        : lotsBn === 0n || !xrplAddress || (xrplCents ?? 0n) > (limit ?? 0n))
+                                }
                                 onClick={() =>
                                     writeContract(
-                                        {
-                                            address: MANAGER_ADDRESS,
-                                            abi: managerAbi,
-                                            functionName: "requestAdvance",
-                                            args: [accountId!, cents],
-                                        },
+                                        leg === "fxrp"
+                                            ? {
+                                                  address: MANAGER_ADDRESS,
+                                                  abi: managerAbi,
+                                                  functionName: "requestAdvance",
+                                                  args: [accountId!, cents],
+                                              }
+                                            : {
+                                                  address: MANAGER_ADDRESS,
+                                                  abi: managerAbi,
+                                                  functionName: "requestAdvanceToXrpl",
+                                                  args: [accountId!, lotsBn, xrplAddress],
+                                                  // Redemption walks the ticket queue and estimateGas comes
+                                                  // back well short of what it actually needs.
+                                                  gas: 6_000_000n,
+                                              },
                                         { onSuccess: () => setTimeout(() => refetchAdvance(), 4000) }
                                     )
                                 }
                             >
-                                {isWriting ? "Sending…" : `Borrow ${usd(cents)}`}
+                                {isWriting
+                                    ? "Sending…"
+                                    : leg === "fxrp"
+                                      ? `Borrow ${usd(cents)}`
+                                      : `Borrow ${xrplCents ? usd(xrplCents) : "…"} as XRP`}
                             </button>
                         </div>
                         {txHash && (

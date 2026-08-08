@@ -122,7 +122,32 @@ export const managerAbi = [
         inputs: [],
         outputs: [{ type: "uint256" }],
     },
+    { type: "function", name: "lotSize", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+    {
+        type: "function",
+        name: "fxrpToUsdCents",
+        stateMutability: "view",
+        inputs: [
+            { name: "fxrpRaw", type: "uint256" },
+            { name: "price", type: "uint256" },
+            { name: "priceDecimals", type: "int8" },
+        ],
+        outputs: [{ type: "uint256" }],
+    },
+    {
+        type: "function",
+        name: "requestAdvanceToXrpl",
+        stateMutability: "nonpayable",
+        inputs: [
+            { name: "accountId", type: "bytes32" },
+            { name: "lots", type: "uint256" },
+            { name: "xrplAddress", type: "string" },
+        ],
+        outputs: [],
+    },
 ] as const;
+
+export const XRPL_EXPLORER = "https://testnet.xrpl.org";
 
 export const usd = (cents: bigint | number) =>
     `$${(Number(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
