@@ -56,7 +56,24 @@ export interface Window {
  * NOTE: this request carries an Authorization header, and FDC requests are public calldata. Use a read-only
  * restricted key and expect it to be world-readable. See docs/BLOCKERS.md.
  */
+/**
+ * The key is about to be written into public calldata, permanently. A standard secret key there would publish
+ * full read-write access to the account, so refuse it outright rather than trust care.
+ */
+function assertRestricted(apiKey: string) {
+    if (apiKey.startsWith("sk_")) {
+        throw new Error(
+            "Refusing to attest with a standard secret key: attestation requests are public on chain. " +
+                "Use the read-only restricted key (rk_...) in STRIPE_API_KEY."
+        );
+    }
+    if (!apiKey.startsWith("rk_")) {
+        throw new Error(`Expected a restricted key (rk_...) in STRIPE_API_KEY, got "${apiKey.slice(0, 6)}..."`);
+    }
+}
+
 export function stripeSource(w: Window, apiKey: string): SourceConfig {
+    assertRestricted(apiKey);
     return {
         platform: "stripe",
         url: "https://api.stripe.com/v1/payouts",
@@ -73,6 +90,49 @@ export function stripeSource(w: Window, apiKey: string): SourceConfig {
             `| select(.currency == "usd")`,
             `| select(.arrival_date >= ${w.periodStart} and .arrival_date < ${w.periodEnd})`,
             `| .amount] | add // 0),`,
+            `periodStart: ${w.periodStart},`,
+            `periodEnd: ${w.periodEnd}`,
+            `}`,
+        ].join(" "),
+    };
+}
+
+/**
+ * Stripe, read from balance transactions rather than payouts. This is the default.
+ *
+ * Payouts describe money being swept to a bank, which needs a bank account attached and a payout schedule to
+ * have run. Balance transactions describe money being *earned*, which is what is actually being underwritten,
+ * and they exist the moment a charge settles. For a creator being advanced against revenue, earned is the
+ * more honest basis, and it is available months before a new account has any payout history.
+ *
+ * `net` is used rather than `amount`: it is the figure after Stripe's fees, so it is the money the business
+ * actually keeps, and it is what a payout would have contained.
+ *
+ * The filter, step by step:
+ *   .data[]                                   every balance transaction in the page
+ *   select(.reporting_category == "charge")   money in from customers; excludes fees, refunds and transfers
+ *   select(.currency == "usd")                guard the cents assumption
+ *   select(.created >= S and < E)             the window, by when the money was earned
+ *   [ ... .net] | add // 0                    sum after fees, and yield 0 rather than null for an empty window
+ */
+export function stripeBalanceSource(w: Window, apiKey: string): SourceConfig {
+    assertRestricted(apiKey);
+    return {
+        platform: "stripe",
+        url: "https://api.stripe.com/v1/balance_transactions",
+        httpMethod: "GET",
+        headers: JSON.stringify({ Authorization: `Bearer ${apiKey}` }),
+        queryParams: JSON.stringify({ limit: "100" }),
+        body: "{}",
+        postProcessJq: [
+            `{`,
+            `platform: "stripe",`,
+            `accountRef: "${w.accountRef}",`,
+            `revenueCents: ([.data[]`,
+            `| select(.reporting_category == "charge")`,
+            `| select(.currency == "usd")`,
+            `| select(.created >= ${w.periodStart} and .created < ${w.periodEnd})`,
+            `| .net] | add // 0),`,
             `periodStart: ${w.periodStart},`,
             `periodEnd: ${w.periodEnd}`,
             `}`,

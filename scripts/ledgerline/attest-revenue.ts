@@ -14,7 +14,14 @@
  */
 import { ethers } from "hardhat";
 import { prepareAttestationRequestBase, submitAttestationRequest, retrieveDataAndProofBaseWithRetry } from "../utils/fdc";
-import { REVENUE_ABI_SIGNATURE, demoSource, stripeSource, SourceConfig, Window } from "./revenue-sources";
+import {
+    REVENUE_ABI_SIGNATURE,
+    demoSource,
+    stripeSource,
+    stripeBalanceSource,
+    SourceConfig,
+    Window,
+} from "./revenue-sources";
 
 const { VERIFIER_URL_TESTNET, VERIFIER_API_KEY_TESTNET, COSTON2_DA_LAYER_URL } = process.env;
 
@@ -34,10 +41,10 @@ function buildWindow(): Window {
 
 function buildSource(w: Window): SourceConfig {
     const which = (process.env.REVENUE_SOURCE ?? "demo").toLowerCase();
-    if (which === "stripe") {
+    if (which === "stripe" || which === "stripe-payouts") {
         const key = process.env.STRIPE_API_KEY;
-        if (!key) throw new Error("REVENUE_SOURCE=stripe needs STRIPE_API_KEY (use a read-only restricted key)");
-        return stripeSource(w, key);
+        if (!key) throw new Error(`REVENUE_SOURCE=${which} needs STRIPE_API_KEY (a read-only restricted key)`);
+        return which === "stripe" ? stripeBalanceSource(w, key) : stripeSource(w, key);
     }
     return demoSource(w, Number(process.env.DEMO_REVENUE_CENTS ?? 400_000));
 }

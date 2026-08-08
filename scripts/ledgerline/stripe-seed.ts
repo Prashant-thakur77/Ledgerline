@@ -10,6 +10,8 @@
  * Everything here is test mode. No real money moves and nothing is charged.
  */
 
+import "dotenv/config";
+
 const KEY = process.env.STRIPE_SETUP_KEY;
 const API = "https://api.stripe.com/v1";
 
