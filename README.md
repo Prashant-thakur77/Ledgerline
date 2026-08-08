@@ -1,134 +1,159 @@
-<p align="center">
-  <a href="https://flare.network/" target="blank"><img src="https://content.flare.network/Flare-2.svg" width="400" height="300" alt="Flare Logo" /></a>
-</p>
+# Ledgerline
 
-# Flare Hardhat Starter Kit
+**Advances against revenue your payment processor already proves.**
 
-This is a starter kit for interacting with Flare blockchain.
-It provides example code for interacting with enshrined Flare protocol, and useful deployed contracts.
-It also demonstrates, how the official Flare smart contract periphery [package](https://www.npmjs.com/package/@flarenetwork/flare-periphery-contracts) can be used in your projects.
+Flare Summer Signal · Bounty 1, Interoperable Asset Products · Coston2
 
-## Getting started
+---
 
-If you are new to Hardhat please check the [Hardhat getting started doc](https://hardhat.org/hardhat-runner/docs/getting-started#overview)
+## The problem
 
-1. Clone and install dependencies:
+Revenue based financing is a large offchain industry. Pipe, Capchase and Wayflyer advance money against
+recurring revenue, and they do it by reading a business's payment processor with permission. It works, and it
+is closed to most of the world: small ticket sizes are unprofitable for them, and coverage is limited to a
+handful of countries.
 
-    ```console
-    git clone https://github.com/flare-foundation/flare-hardhat-starter.git
-    cd flare-hardhat-starter
-    ```
+Onchain lending cannot do this at all, for one reason. **A smart contract cannot read a Stripe dashboard.**
+Anyone can claim any income. The only workaround has been to trust a company's server to vouch for the number,
+which reintroduces exactly the intermediary the system was supposed to remove.
 
-    and then run:
+Flare's Data Connector removes that. Web2Json calls the API and the network's own data providers agree on the
+response, which arrives on Flare with a Merkle proof. The revenue figure is proven the way a price feed is
+proven. No application specific oracle, no trusted server, nobody to bribe.
 
-    ```console
-    yarn
-    ```
+In one line: **your payment processor already proves you earn four thousand dollars a month, no lender can read
+it, and FDC can.**
 
-    or
+## Who it is for
 
-    ```console
-    npm install --force
-    ```
+A creator or small online business with real, provable earnings and no way to borrow against them. A 22 year
+old earning four thousand dollars a month on Stripe has no credit file for a bank and no crypto collateral for
+DeFi. They have a revenue history, and until now that history could not be used as anything.
 
-2. Set up `.env` file
+## It works, on a real Stripe account
 
-    ```console
-    cp .env.example .env
-    ```
+Not a mock. These are transactions on Coston2 from a live Stripe API call.
 
-3. Change the `PRIVATE_KEY` in the `.env` file to yours
+| | |
+|---|---|
+| Revenue attested — **$3,912.23** read from Stripe, proven on chain | [`0x8bea3e15…`](https://coston2-explorer.flare.network/tx/0x8bea3e154e9bbc70dde5fd32bad90a54aa52a2e68205600e431b4900f77d88af) |
+| Advance issued — **1.918796 FXRP** sent for a **$2.10** obligation | [`0x7996ce9c…`](https://coston2-explorer.flare.network/tx/0x7996ce9cc7e91c2f81bdae01694e56798fa932ad4b8b5468ce43de5333e2e585) |
 
-4. Compile the project
+The Stripe sandbox took three charges totalling $4,030. Stripe's fees brought the net to $3,912.23, and that
+net is the figure underwritten, because it is the money the business actually keeps.
 
-    ```console
-    yarn hardhat compile
-    ```
+## Deployed on Coston2 (chain id 114)
 
-    or
+| Contract | Address |
+|---|---|
+| `RevenueOracle` | [`0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8`](https://coston2-explorer.flare.network/address/0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8#code) |
+| `AdvanceManager` | [`0x5774E51335277893c5f177bb6735b4CF2fE76A63`](https://coston2-explorer.flare.network/address/0x5774E51335277893c5f177bb6735b4CF2fE76A63#code) |
+| FXRP (`FTestXRP`) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |
 
-    ```console
-    npx hardhat compile
-    ```
+Both contracts are source-verified on the explorer. Full deployment notes in [docs/DEPLOYED.md](docs/DEPLOYED.md).
 
-    This will compile all `.sol` files in your `/contracts` folder.
-    It will also generate artifacts that will be needed for testing.
-    Contracts `Imports.sol` import MockContracts and Flare related mocks, thus enabling mocking of the contracts from typescript.
+## How to run it
 
-5. Run Tests
+```bash
+cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
+yarn install
+yarn hardhat test             # 34 tests
 
-    ```console
-    yarn hardhat test
-    ```
+# fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
+yarn hardhat run scripts/ledgerline/deploy.ts --network coston2
 
-    or
+# prove a period of revenue, then borrow against it
+REVENUE_SOURCE=stripe ACCOUNT_REF=acct_… yarn hardhat run scripts/ledgerline/attest-revenue.ts --network coston2
+PLATFORM=stripe ACCOUNT_REF=acct_… USD_CENTS=200 yarn hardhat run scripts/ledgerline/take-advance.ts --network coston2
 
-    ```console
-    npx hardhat test
-    ```
-
-6. Deploy
-
-    Check the `hardhat.config.ts` file, where you define which networks you want to interact with.
-    Flare mainnet & test network details are already added in that file.
-
-    Make sure that you have added API Keys in the `.env` file
-
-    ```console
-    npx hardhat run scripts/tryDeployment.ts
-    ```
-
-## Repository structure
-
-```
-├── contracts: Solidity smart contracts
-├── scripts: Typescript scripts that interact with the blockchain
-├── test
-├── hardhat.config.ts
-├── package.json
-├── README.md
-├── tsconfig.json
-└── yarn.lock
+cd web && npm install && npm run dev      # the interface, on :3000
 ```
 
-## Contributing
+`REVENUE_SOURCE=demo` runs the same pipeline against a keyless public endpoint, so the whole flow can be
+demonstrated without a Stripe account.
 
-Before opening a pull request, lint and format the code.
-You can do that by running the following commands.
+## How Flare is used
 
-```sh
-yarn format:fix
-```
+Three Flare systems do load-bearing work here. Removing any one does not degrade the product; it deletes it.
 
-```sh
-yarn lint:fix
-```
+**FDC Web2Json is the underwriting.** It is the only reason this product can exist on chain at all. It calls
+Stripe, reduces the response with a jq filter that every data provider runs independently, and delivers the
+result with a Merkle proof that `RevenueOracle` verifies before storing anything. **Without it there is no way
+to know anyone's revenue**, and the contract would be underwriting self-reported numbers — which is to say, not
+underwriting at all. The alternative every other design falls back on is a server that signs the figure, and
+that server is precisely the intermediary this is supposed to remove.
 
-## Clean repository
+**FTSOv2 makes the obligation a dollar obligation.** The advance is recorded in US cents and converted to FXRP
+at the rate read at the moment value moves. A borrower who takes $1,000 owes $1,000 plus the fee, whatever XRP
+does next. **Without it the debt would be denominated in XRP**, so a borrower advanced $1,000 could owe the
+equivalent of $3,000 after a price move — turning a working capital product into a leveraged bet on a currency
+the borrower never asked to hold. There is a test that moves XRP 3x and asserts the dollar obligation does not
+change.
 
-If you want to start building your projects from a repository that is already setup to work with Flare correctly, but you do not want to keep any of the examples, these are the files you should delete:
+**FAssets is the money that moves.** The advance is disbursed in FXRP, which is XRP made usable by smart
+contracts. **Without it there is no XRP-denominated asset a contract can hold or transfer at all** — XRP has no
+native smart contract capability, so the disbursement leg would have to be some other chain's asset and the
+product would stop being about XRP.
 
-- all files in the `contracts/` folder
-- all files in the `scripts/` folder, except for the `scripts/fdcExample/Base.ts` which might come in useful
+Honestly stated: this build **uses** FXRP as the disbursed asset but does not yet **mint or redeem** through
+the FAssets flow. That is the first item on the roadmap, and it is the difference between using the asset and
+using the bridge.
 
-A shell command that does this is:
+## What was built during the hackathon
 
-```sh
-rm -rf contracts/* & mv scripts/fdcExample/Base.ts ./Base.ts & rm -rf scripts/* & mv ./Base.ts scripts/Base.ts
-```
+Everything in `contracts/ledgerline/`, `scripts/ledgerline/`, `test/` and `web/` is new. The repository is the
+[flare-hardhat-starter](https://github.com/flare-foundation/flare-hardhat-starter); its own examples are
+untouched and were used only to validate the environment in Phase 0.
 
-## Patches
+- **`RevenueOracle.sol`** — verifies a Web2Json proof, derives account identity from the attested payload
+  rather than caller input, and stores revenue history. Guards replay, account mismatch, stale periods, and
+  a second wallet claiming an already bound account.
+- **`AdvanceManager.sol`** — underwriting, FTSO conversion, FXRP treasury, manual and revenue-triggered
+  repayment, delinquency.
+- **34 tests**, including the 3x price move and a case asserting the same price at 6 and 8 decimals yields the
+  same answer.
+- **`scripts/ledgerline/`** — attestation with round-waiting and progress, Stripe sandbox seeding, deployment
+  with explorer verification, and a per-platform jq registry.
+- **`web/`** — Next.js and wagmi interface.
+- **[docs/PHASE0.md](docs/PHASE0.md)** — the environment validation, with every address and encoding written down.
 
-This project uses `patch-package` to fix an upstream bug in `@openzeppelin/upgrades-core@1.44.2`.
+## Honesty notes
 
-**Issue:** When `ethereum-cryptography` v3.x is installed, `ethereumjs-util`'s `keccak256` returns a `Uint8Array` instead of a `Buffer`. The OpenZeppelin code calls `.toString('hex')` expecting a Buffer, but `Uint8Array.toString()` ignores the encoding argument and returns comma-separated decimals (e.g., `54,8,148,...`) instead of a hex string. This breaks contract verification and proxy detection.
+**This is unsecured credit.** A borrower can take an advance and stop earning. Nothing here solves that. The
+incentives that push against it are real but partial: revenue history is the reputation, defaults are recorded
+on chain, and advances start small and grow with repayment history. There is no on-chain recovery, and the
+contract says so rather than implying otherwise.
 
-**Fix:** The patch wraps `keccak256()` results with `Buffer.from()` before calling `.toString('hex')`. It's automatically applied on `yarn install` via the postinstall script.
+**The Stripe key is published on chain.** FDC attestation requests are public calldata, so the API key travels
+in the clear and is permanently readable. This breaks confidentiality, not trust — the attested figure is still
+proven by the network, so the integrity claim above is untouched. It is mitigated by using a read-only
+restricted key scoped to two endpoints, and both source functions refuse an `sk_` key outright. The production
+answer is per-borrower keys scoped to their own account. See [docs/BLOCKERS.md](docs/BLOCKERS.md).
 
-Once OpenZeppelin releases a fix upstream, this patch can be removed.
+**Underwriting has so far run on a single proven period.** The contract averages up to three, and there are
+tests covering one, three and five proven periods, but a sandbox opened today cannot have three months of
+history. On a real account this is not a limitation; in this demo it is.
 
-## Resources
+**Revenue-triggered repayment is tested but has not been run on Coston2.** `applyRevenueRepayment` has unit
+tests, including one asserting the same period cannot be taken twice, but demonstrating it on chain needs a
+second attested period, which needs a second day of Stripe data.
 
-- [Flare Developer Hub](https://dev.flare.network/)
-- [Hardhat Guides](https://dev.flare.network/fdc/guides/hardhat)
-- [Hardhat Docs](https://hardhat.org/docs)
+**Revenue based financing is not a new idea and this does not claim to be.** What is new is doing it without a
+trusted intermediary reading the API, and settling it in an asset that had no smart contract capability at all
+until FAssets.
+
+**The demo runs on Stripe test mode.** The API responses are real; the money behind them is not.
+
+## Roadmap
+
+1. **The XRPL leg.** Redeem FXRP through FAssets so the borrower receives real XRP in the wallet they already
+   use, and accept repayment as a plain XRP payment proven by FDC's Payment attestation. This removes the EVM
+   wallet requirement entirely — the borrower would never need one. Scoped and understood; cut from this build
+   for time rather than for difficulty.
+2. **A second platform.** Shopify or YouTube. The oracle already takes `platform` as a field and `accountRef`
+   as opaque, so this is an entry in `revenue-sources.ts` and no contract change.
+3. **A lender side.** The treasury is a single owner-funded pool today. Real capital needs LP shares, a yield
+   split and default accounting.
+4. **Underwriting that uses the trend.** The full history is stored and currently only averaged. Growth,
+   volatility and seasonality are all visible in it.
+5. **Per-borrower key scoping**, so the published key reads one account's aggregate and nothing else.
