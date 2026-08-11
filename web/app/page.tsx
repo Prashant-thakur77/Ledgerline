@@ -3,13 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import {
     useAccount,
+    useChainId,
     useConnect,
     useDisconnect,
     usePublicClient,
     useReadContract,
     useSimulateContract,
+    useSwitchChain,
     useWriteContract,
 } from "wagmi";
+import { flareTestnet } from "wagmi/chains";
 import {
     ORACLE_ADDRESS,
     MANAGER_ADDRESS,
@@ -21,47 +24,25 @@ import {
     price,
     day,
 } from "@/lib/contracts";
+import { ProofLine, short } from "./components/ProofLine";
+import { Mechanism } from "./components/Mechanism";
+import { ProveRevenue } from "./components/ProveRevenue";
 
-const PLATFORM = process.env.NEXT_PUBLIC_PLATFORM ?? "stripe";
-const ACCOUNT_REF = process.env.NEXT_PUBLIC_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
-
-const SOURCE_LABEL: Record<string, string> = {
-    stripe: "stripe balance transactions",
-    demo: "public demo endpoint",
-};
-
-function short(hash: string) {
-    return `${hash.slice(0, 6)}…${hash.slice(-4)}`;
-}
-
-/**
- * The signature element. Under every attested figure, and under nothing else.
- * Names where the fact came from and how it was checked, and opens the transaction that verified it.
- */
-function ProofLine({ round, merkleRoot, txHash }: { round: bigint; merkleRoot: string; txHash?: string }) {
-    const body = (
-        <>
-            verified<span className="sep">·</span>
-            {SOURCE_LABEL[PLATFORM] ?? PLATFORM}
-            <span className="sep">·</span>fdc round {round.toLocaleString("en-US")}
-            <span className="sep">·</span>merkle {short(merkleRoot)}
-            {txHash ? " ↗" : ""}
-        </>
-    );
-    return txHash ? (
-        <a className="proof" href={`${EXPLORER}/tx/${txHash}`} target="_blank" rel="noreferrer">
-            {body}
-        </a>
-    ) : (
-        <span className="proof">{body}</span>
-    );
-}
+const STRIPE_ACCOUNT_REF = process.env.NEXT_PUBLIC_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
 
 export default function Page() {
     const { address, isConnected } = useAccount();
     const { connect, connectors, isPending } = useConnect();
     const { disconnect } = useDisconnect();
+    const { switchChain } = useSwitchChain();
+    const chainId = useChainId();
     const client = usePublicClient();
+
+    // Which account the page is looking at. The Stripe account is ours and is bound to the wallet that first
+    // proved it; the sandbox one belongs to whoever is connected, so a visitor can run the whole loop.
+    const [view, setView] = useState<"stripe" | "mine">("stripe");
+    const platform = view === "stripe" ? "stripe" : "demo";
+    const accountRef = view === "stripe" ? STRIPE_ACCOUNT_REF : (address ?? "");
 
     const [amount, setAmount] = useState("2.00");
     const [leg, setLeg] = useState<"fxrp" | "xrpl">("fxrp");
@@ -75,15 +56,23 @@ export default function Page() {
         address: ORACLE_ADDRESS,
         abi: oracleAbi,
         functionName: "accountIdFor",
-        args: [PLATFORM, ACCOUNT_REF],
+        args: [platform, accountRef],
+        query: { enabled: Boolean(accountRef) },
     });
 
     // Polls, so an attestation landing while the page is open animates in rather than needing a refresh.
     const on = { query: { enabled: Boolean(accountId), refetchInterval: 12_000 } };
-    const { data: history } = useReadContract({
+    const { data: history, refetch: refetchHistory } = useReadContract({
         address: ORACLE_ADDRESS,
         abi: oracleAbi,
         functionName: "revenueHistory",
+        args: [accountId!],
+        ...on,
+    });
+    const { data: boundOwner } = useReadContract({
+        address: ORACLE_ADDRESS,
+        abi: oracleAbi,
+        functionName: "accountOwner",
         args: [accountId!],
         ...on,
     });
@@ -100,6 +89,12 @@ export default function Page() {
         functionName: "advanceOf",
         args: [accountId!],
         ...on,
+    });
+    const { data: treasury } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "treasuryBalance",
+        query: { refetchInterval: 15_000 },
     });
     const { data: feeBps } = useReadContract({ address: MANAGER_ADDRESS, abi: managerAbi, functionName: "feeBps" });
     const { data: shareBps } = useReadContract({
@@ -169,6 +164,12 @@ export default function Page() {
         seenCount.current = periods.length;
     }, [periods.length]);
 
+    // Switching which account is on screen resets the "what have I already seen" baseline.
+    useEffect(() => {
+        seenCount.current = null;
+        setTxByPeriod({});
+    }, [accountId]);
+
     const cents = BigInt(Math.round(parseFloat(amount || "0") * 100));
     const { data: quoted } = useReadContract({
         address: MANAGER_ADDRESS,
@@ -213,6 +214,7 @@ export default function Page() {
                         <td className="right">
                             <span className="mono amount">{usd(r.revenueCents)}</span>
                             <ProofLine
+                                platform={platform}
                                 round={r.votingRound}
                                 merkleRoot={r.merkleRoot}
                                 txHash={txByPeriod[String(r.periodEnd)]}
@@ -230,12 +232,12 @@ export default function Page() {
         const newest = periods[periods.length - 1];
         return (
             <main>
-                <h1>Borrow against revenue you can prove.</h1>
-                <p className="lede">
+                <h1 className="rise">Borrow against revenue you can prove.</h1>
+                <p className="lede rise" style={{ animationDelay: "60ms" }}>
                     Your payment processor already knows you earn four thousand dollars a month. No lender can read
                     it, so no lender will price it.
                 </p>
-                <p>
+                <p className="rise" style={{ animationDelay: "120ms" }}>
                     Flare&apos;s Data Connector reads it instead. It calls the API, the network&apos;s own data
                     providers agree on the answer, and the figure arrives on chain with a Merkle proof — proven the
                     way a price feed is proven. Nobody vouches for it. There is nobody to bribe.
@@ -248,6 +250,7 @@ export default function Page() {
                             <span className="quiet">Proven for the period ending {day(newest.periodEnd)}</span>
                             <span className="figure amount">{usd(newest.revenueCents)}</span>
                             <ProofLine
+                                platform={platform}
                                 round={newest.votingRound}
                                 merkleRoot={newest.merkleRoot}
                                 txHash={txByPeriod[String(newest.periodEnd)]}
@@ -261,15 +264,21 @@ export default function Page() {
                     </>
                 )}
 
+                <h2>How it works</h2>
+                <Mechanism />
+
                 <h2>Connect</h2>
                 <div className="block">
-                    {connectors.map((c) => (
-                        <button key={c.uid} onClick={() => connect({ connector: c })} disabled={isPending}>
-                            {isPending ? "Connecting…" : `Connect ${c.name}`}
-                        </button>
-                    ))}
+                    <div className="choices">
+                        {connectors.map((c) => (
+                            <button key={c.uid} onClick={() => connect({ connector: c })} disabled={isPending}>
+                                {isPending ? "Connecting…" : `Connect ${c.name}`}
+                            </button>
+                        ))}
+                    </div>
                     <p className="quiet" style={{ marginTop: 14, marginBottom: 0 }}>
-                        Coston2 testnet, chain id 114. No real money is involved.
+                        Coston2 testnet, chain id 114. No real money is involved. Once connected you can run a real
+                        FDC attestation yourself and borrow against the result.
                     </p>
                 </div>
             </main>
@@ -279,39 +288,100 @@ export default function Page() {
     // ------------------------------------------------------------------ connected
 
     const open = advance?.open ?? false;
+    const wrongChain = chainId !== flareTestnet.id;
+    const isBoundOwner =
+        Boolean(boundOwner) &&
+        boundOwner !== "0x0000000000000000000000000000000000000000" &&
+        boundOwner?.toLowerCase() === address?.toLowerCase();
+    const unbound = !boundOwner || boundOwner === "0x0000000000000000000000000000000000000000";
+
+    // What the treasury can actually pay out right now, in dollars.
+    const treasuryCents =
+        treasury !== undefined && xrpUsd && priceDecimals !== undefined
+            ? (treasury * xrpUsd) / 10n ** BigInt(priceDecimals) / 10_000n
+            : undefined;
+    const treasuryDry = treasury !== undefined && treasury === 0n;
 
     return (
         <main>
             <h1>Ledgerline</h1>
             <div className="row" style={{ padding: 0 }}>
                 <span className="mono">
-                    {PLATFORM}/{ACCOUNT_REF}
+                    {platform}/{view === "stripe" ? accountRef : short(accountRef || "0x")}
                 </span>
                 <button className="link" onClick={() => disconnect()}>
                     {address?.slice(0, 6)}…{address?.slice(-4)} · disconnect
                 </button>
             </div>
 
+            {wrongChain && (
+                <div className="block">
+                    <p className="alert" style={{ margin: 0 }}>
+                        This wallet is on chain {chainId}. Ledgerline lives on Coston2, chain id {flareTestnet.id}.
+                    </p>
+                    <div style={{ marginTop: 12 }}>
+                        <button className="wide" onClick={() => switchChain({ chainId: flareTestnet.id })}>
+                            Switch to Coston2
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <h2>Whose revenue</h2>
+            <div className="block">
+                <div className="choices">
+                    <button className="ghost" aria-pressed={view === "stripe"} onClick={() => setView("stripe")}>
+                        Our Stripe account
+                    </button>
+                    <button className="ghost" aria-pressed={view === "mine"} onClick={() => setView("mine")}>
+                        Yours
+                    </button>
+                </div>
+                <p className="quiet" style={{ marginTop: 14, marginBottom: 0 }}>
+                    {view === "stripe"
+                        ? "A real Stripe sandbox account, bound to the wallet that first proved it. You can read every figure and open every proof."
+                        : unbound
+                          ? "Nothing proven for your wallet yet. Run an attestation below and this becomes an account you own and can borrow against."
+                          : "Proven under your wallet. RevenueOracle bound this account to you the first time you attested for it."}
+                </p>
+            </div>
+
             <h2>Proven revenue</h2>
             {periods.length === 0 ? (
                 <div className="block">
                     <p style={{ margin: 0 }}>
-                        Connect a revenue account to prove your earnings. Run the attestation script and the figure
-                        appears here the moment the voting round finalises.
+                        Nothing proven yet for this account. Run an attestation below; the figure appears here the
+                        moment the voting round finalises.
                     </p>
                 </div>
             ) : (
                 provenTable
             )}
 
+            <h2>Prove a period</h2>
+            <ProveRevenue
+                source={view === "stripe" ? "stripe" : "demo"}
+                address={address}
+                isBoundOwner={view === "stripe" ? isBoundOwner : true}
+                onProven={() => {
+                    void refetchHistory();
+                }}
+            />
+
             <h2>What you can borrow</h2>
             <div className="block">
                 <span className="figure">{usd(limit ?? 0n)}</span>
                 <p className="quiet" style={{ marginTop: 16, marginBottom: 0 }}>
-                    The mean of your last {averaged} attested {averaged === 1 ? "period" : "periods"} is{" "}
-                    <span className="mono">{usd(avg)}</span>. A first advance is one times that mean. Nothing else
-                    goes into it, and the inputs are stored on the advance itself so the decision can be checked
-                    afterwards.
+                    {periods.length === 0 ? (
+                        "Nothing, until a period is proven. There is no other input."
+                    ) : (
+                        <>
+                            The mean of the last {averaged} attested {averaged === 1 ? "period" : "periods"} is{" "}
+                            <span className="mono">{usd(avg)}</span>. A first advance is one times that mean.
+                            Nothing else goes into it, and the inputs are stored on the advance itself so the
+                            decision can be checked afterwards.
+                        </>
+                    )}
                 </p>
             </div>
 
@@ -321,13 +391,8 @@ export default function Page() {
                     <div className="block">
                         <div className="row">
                             <span>Where the money goes</span>
-                            <span>
-                                <button
-                                    className="ghost"
-                                    aria-pressed={leg === "fxrp"}
-                                    onClick={() => setLeg("fxrp")}
-                                    style={{ marginRight: 8 }}
-                                >
+                            <span className="choices">
+                                <button className="ghost" aria-pressed={leg === "fxrp"} onClick={() => setLeg("fxrp")}>
                                     FXRP on Flare
                                 </button>
                                 <button className="ghost" aria-pressed={leg === "xrpl"} onClick={() => setLeg("xrpl")}>
@@ -349,8 +414,8 @@ export default function Page() {
                             <>
                                 <p className="quiet">
                                     The FXRP is redeemed through FAssets and an agent pays your XRP Ledger account
-                                    directly. You never hold FXRP. FAssets redeems whole lots only, {lot ? fxrp(lot) : "10"}{" "}
-                                    XRP each, so this route starts at about ten dollars.
+                                    directly. You never hold FXRP. FAssets redeems whole lots only,{" "}
+                                    {lot ? fxrp(lot) : "10"} XRP each, so this route starts at about ten dollars.
                                 </p>
                                 <div className="row">
                                     <span>Lots</span>
@@ -363,7 +428,6 @@ export default function Page() {
                                         onChange={(e) => setXrplAddress(e.target.value)}
                                         placeholder="r…"
                                         aria-label="Your XRP Ledger address"
-                                        style={{ width: 240 }}
                                     />
                                 </div>
                             </>
@@ -400,11 +464,34 @@ export default function Page() {
                                 })()}
                             </span>
                         </div>
+                        <div className="row">
+                            <span>In the treasury now</span>
+                            <span className="mono">
+                                {treasury === undefined
+                                    ? "…"
+                                    : `${fxrp(treasury)} FXRP${treasuryCents !== undefined ? ` · ${usd(treasuryCents)}` : ""}`}
+                            </span>
+                        </div>
+
+                        {/*
+                         * Say it plainly rather than letting the button revert. A demo that fails at the last
+                         * step in front of a judge is worse than one that explains why it cannot run.
+                         */}
+                        {treasuryDry && (
+                            <p className="alert" style={{ marginTop: 14, marginBottom: 0 }}>
+                                The treasury is empty, so no advance can be issued right now. Everything above is
+                                live — the proven revenue, the limit and the price are all being read from chain.
+                                Funding it is a faucet claim, not a code change.
+                            </p>
+                        )}
 
                         <div style={{ marginTop: 20 }}>
                             <button
+                                className="wide"
                                 disabled={
                                     isWriting ||
+                                    wrongChain ||
+                                    treasuryDry ||
                                     !accountId ||
                                     (leg === "fxrp"
                                         ? cents === 0n || cents > (limit ?? 0n)
@@ -498,11 +585,15 @@ export default function Page() {
                         <p style={{ margin: 0 }}>
                             Each newly proven period repays {shareBps ? Number(shareBps) / 100 : 20}% of that
                             period&apos;s revenue, converted to FXRP at the rate current at that moment. Nobody has to
-                            remember to pay; a proven period is the trigger.
+                            remember to pay; a proven period is the trigger. Prove another period above and watch
+                            the figure fall.
                         </p>
                     </div>
                 </>
             )}
+
+            <h2>How it works</h2>
+            <Mechanism />
 
             <h2>Contracts</h2>
             <div className="block">
@@ -518,6 +609,10 @@ export default function Page() {
                         {short(MANAGER_ADDRESS)} ↗
                     </a>
                 </div>
+                <p className="quiet" style={{ marginTop: 12, marginBottom: 0 }}>
+                    Both are source-verified on the Coston2 explorer. Every figure on this page is read from them
+                    directly; nothing is cached or served from a database.
+                </p>
             </div>
         </main>
     );
