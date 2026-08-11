@@ -15,7 +15,7 @@ these six places:**
 | Path | What it is |
 |---|---|
 | [`contracts/ledgerline/`](contracts/ledgerline/) | The two contracts. ~330 lines of Solidity, both source-verified on chain. |
-| [`test/`](test/) | 46 tests. `RevenueOracle` (13), `AdvanceManager` (23), `AdvanceToXrpl` (10). |
+| [`test/`](test/) | 65 tests. `RevenueOracle` (13), `AdvanceManager` (23), `AdvanceToXrpl` (10), `RepayFromXrpl` (19). |
 | [`scripts/ledgerline/`](scripts/ledgerline/) | Deploy, attest, borrow, repay, redeem to XRPL, and a one-screen state dump. |
 | [`web/app/`](web/app/) | The interface, including the live attestation console and its two API routes. |
 | [`web/lib/`](web/lib/) | The Flare protocol layer the browser drives an attestation with. |
@@ -126,7 +126,7 @@ Both contracts are source-verified on the explorer. Full deployment notes in [do
 ```bash
 cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
 yarn install
-yarn hardhat test             # 46 tests
+yarn hardhat test             # 65 tests
 
 # fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
 yarn hardhat run scripts/ledgerline/deploy.ts --network coston2
@@ -216,7 +216,7 @@ Every file listed in [Where the code is](#where-the-code-is) was written from sc
 - **[`AdvanceManager.sol`](contracts/ledgerline/AdvanceManager.sol)** — underwriting, FTSOv2 conversion, the
   FXRP treasury, `requestAdvance`, `requestAdvanceToXrpl`, manual and revenue-triggered repayment, delinquency.
 
-**Tests** — [`test/`](test/), **46 passing**, `npx hardhat test`
+**Tests** — [`test/`](test/), **65 passing**, `npx hardhat test`
 
 Includes a 3x XRP price move asserting the dollar obligation does not change, and a case running the same
 price at 6 and 8 decimals and demanding the same answer. Four mock contracts stub the FDC and FTSO calls that
@@ -383,10 +383,17 @@ key and a guard that refuses an `sk_` key outright, but it deserves a warning at
 
 ## Roadmap
 
-1. **Repayment from the XRP Ledger.** Disbursement to XRPL is built; the return leg is not. The borrower would
-   send a plain XRP payment with the advance id in the memo, and FDC's **Payment** attestation would prove it
-   on Flare and reduce the obligation — a second FDC attestation type, and the last step needed for a borrower
-   who never touches an EVM wallet in either direction.
+1. **Repayment from the XRP Ledger — written and tested, not yet deployed.** `repayFromXrpl` takes an FDC
+   **Payment** proof of a plain XRP transfer into the treasury account carrying the account id as its payment
+   reference, prices it through FTSOv2 and reduces the dollar obligation. That is a second FDC attestation
+   type alongside Web2Json, and the last step needed for a borrower who never touches an EVM wallet in either
+   direction. It has 19 tests covering the conversion, overpayment, replay, wrong chain, wrong recipient,
+   wrong reference and an unverified proof.
+
+   **It is not in the deployed contract.** The `AdvanceManager` address below predates it. Deploying it means
+   a new address and a re-funded treasury, which is queued behind a faucet claim rather than done in a hurry
+   before a deadline — so the honest status is: the code exists and passes tests, and the chain has not seen
+   it yet. Nothing in this README's evidence section depends on it.
 2. **Advances below one lot on the XRPL leg.** FAssets redeems whole lots only, 10 XRP on Coston2, so the
    smallest XRPL-settled advance is about $10. Smaller advances work on the FXRP leg. Batching or a float
    would close the gap.

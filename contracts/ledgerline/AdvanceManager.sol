@@ -59,6 +59,9 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     /// @notice Months averaged when underwriting.
     uint8 public constant PERIODS_AVERAGED = 3;
 
+    /// @notice The XRP Ledger's minimal unit. One XRP is a million drops.
+    uint256 public constant DROPS_PER_XRP = 1_000_000;
+
     RevenueOracle public immutable oracle;
     IERC20 public immutable fxrp;
     uint8 public immutable fxrpDecimals;
@@ -131,6 +134,17 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     );
     event AssetManagerSet(address assetManager);
     event MarkedDelinquent(bytes32 indexed accountId, uint256 outstandingCents);
+    event XrplTreasurySet(string xrplAddress, bytes32 xrplAddressHash, bytes32 sourceId);
+    /// @notice A repayment that arrived as real XRP on the XRP Ledger and was proven by FDC.
+    event RepaidFromXrpl(
+        bytes32 indexed accountId,
+        bytes32 indexed xrplTransactionId,
+        uint256 drops,
+        uint256 usdCents,
+        uint256 xrpUsdPrice,
+        int8 priceDecimals,
+        uint256 outstandingCents
+    );
 
     error NoRevenueProven();
     error NotAccountOwner(address owner, address caller);
@@ -145,6 +159,13 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     error GracePeriodNotElapsed();
     error InvalidXrplAddress();
     error XrplDisbursementUnavailable();
+    error XrplRepaymentUnavailable();
+    error InvalidPaymentProof();
+    error WrongPaymentChain(bytes32 expected, bytes32 got);
+    error PaymentNotSuccessful(uint8 status);
+    error WrongPaymentRecipient();
+    error WrongPaymentReference(bytes32 expected, bytes32 got);
+    error XrplPaymentAlreadyUsed(bytes32 transactionId);
 
     constructor(address oracleAddress, address fxrpAddress) Ownable(msg.sender) {
         oracle = RevenueOracle(oracleAddress);
@@ -339,6 +360,75 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         if (closed) emit AdvanceClosed(accountId);
     }
 
+    /**
+     * @notice Repay from the XRP Ledger, by proving a plain XRP payment with FDC.
+     *
+     * This is the return leg of `requestAdvanceToXrpl`, and it closes the loop: the borrower is funded in
+     * real XRP on the XRP Ledger and repays in real XRP on the XRP Ledger. Neither direction requires them
+     * to hold an EVM asset, and — if the request is placed on their behalf — neither requires an EVM wallet
+     * at all. The obligation being settled still lives on Flare and is still denominated in dollars.
+     *
+     * The borrower sends an ordinary Payment to `xrplTreasuryAddress` carrying `accountId` as the
+     * transaction's payment reference, which on the XRP Ledger is the `InvoiceID` field. That reference is
+     * what ties an otherwise anonymous payment to a specific obligation.
+     *
+     * This is a second FDC attestation type: revenue arrives through Web2Json, repayment through Payment.
+     * The same Merkle proof machinery verifies both.
+     *
+     * @dev Check order is deliberate and mirrors Flare's own `PaymentProofs` library in Smart Accounts: the
+     * cheap field comparisons run first and the expensive FDC verification runs last.
+     */
+    function repayFromXrpl(bytes32 accountId, IPayment.Proof calldata proof) external nonReentrant {
+        if (xrplTreasuryAddressHash == bytes32(0)) revert XrplRepaymentUnavailable();
+
+        Advance storage advance = _advances[accountId];
+        if (!advance.open) revert NoOpenAdvance();
+
+        IPayment.ResponseBody calldata body = proof.data.responseBody;
+
+        if (proof.data.sourceId != xrplSourceId) revert WrongPaymentChain(xrplSourceId, proof.data.sourceId);
+        if (body.status != 0) revert PaymentNotSuccessful(body.status);
+        if (body.receivingAddressHash != xrplTreasuryAddressHash) revert WrongPaymentRecipient();
+        if (body.standardPaymentReference != accountId) {
+            revert WrongPaymentReference(accountId, body.standardPaymentReference);
+        }
+
+        bytes32 transactionId = proof.data.requestBody.transactionId;
+        if (xrplPaymentUsed[transactionId]) revert XrplPaymentAlreadyUsed(transactionId);
+        if (body.receivedAmount <= 0) revert InvalidAmount();
+
+        if (!_verifyPayment(proof)) revert InvalidPaymentProof();
+
+        (uint256 price, int8 priceDecimals) = _xrpUsd();
+        if (price == 0) revert InvalidPrice();
+
+        uint256 drops = uint256(body.receivedAmount);
+        uint256 usdCents = xrpDropsToUsdCents(drops, price, priceDecimals);
+        if (usdCents == 0) revert InvalidAmount();
+
+        // Overpaying closes the advance rather than reverting. A borrower cannot retract an XRPL payment,
+        // so rejecting it here would take their money and leave the debt standing.
+        if (usdCents > advance.outstandingCents) usdCents = advance.outstandingCents;
+
+        xrplPaymentUsed[transactionId] = true;
+        advance.outstandingCents -= usdCents;
+        advance.lastActivityAt = uint64(block.timestamp);
+
+        bool closed = advance.outstandingCents == 0;
+        if (closed) advance.open = false;
+
+        /*
+         * Deliberately no change to `treasuryBalance`. The XRP landed in an XRP Ledger account, not as FXRP
+         * on Flare, so the Flare-side treasury genuinely did not grow and claiming otherwise would put a
+         * number in storage that no balance backs. Returning that value to the treasury means minting FXRP
+         * from the received XRP through FAssets, which is the production answer and is not built here.
+         */
+        emit RepaidFromXrpl(
+            accountId, transactionId, drops, usdCents, price, priceDecimals, advance.outstandingCents
+        );
+        if (closed) emit AdvanceClosed(accountId);
+    }
+
     /// @notice Record that an advance has gone unserviced past the grace period.
     function markDelinquent(bytes32 accountId) external {
         Advance storage advance = _advances[accountId];
@@ -387,9 +477,35 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         return (fxrpRaw * price * 100) / (priceScale * tokenScale);
     }
 
+    /**
+     * @notice What a quantity of XRP, in drops, is worth in US cents.
+     * @dev Deliberately independent of `fxrpDecimals`. A drop is 10^-6 XRP and FXRP also has 6 decimals on
+     * Coston2, so the two scales happen to coincide today — but they are unrelated quantities, and writing
+     * this in terms of the token's decimals would silently break if either ever changed.
+     */
+    function xrpDropsToUsdCents(uint256 drops, uint256 price, int8 priceDecimals) public pure returns (uint256) {
+        if (price == 0) revert InvalidPrice();
+        uint256 priceScale = 10 ** uint256(uint8(priceDecimals));
+        return (drops * price * 100) / (priceScale * DROPS_PER_XRP);
+    }
+
     function setAssetManager(address newAssetManager) external onlyOwner {
         assetManager = IFAssetRedeemer(newAssetManager);
         emit AssetManagerSet(newAssetManager);
+    }
+
+    /**
+     * @notice Set the XRPL account borrowers repay to, and the chain their payment must have happened on.
+     * @param newXrplAddress The classic XRPL address, exactly as it will appear in the payment.
+     * @param newSourceId The FDC source id — `bytes32("testXRP")` on Coston2, `bytes32("XRP")` in production.
+     * @dev The hash is `keccak256` of the address string, which is the standard address hash FDC attests.
+     */
+    function setXrplTreasury(string calldata newXrplAddress, bytes32 newSourceId) external onlyOwner {
+        if (bytes(newXrplAddress).length == 0) revert InvalidXrplAddress();
+        xrplTreasuryAddress = newXrplAddress;
+        xrplTreasuryAddressHash = keccak256(bytes(newXrplAddress));
+        xrplSourceId = newSourceId;
+        emit XrplTreasurySet(newXrplAddress, xrplTreasuryAddressHash, newSourceId);
     }
 
     /// @notice Lot size in FXRP base units, or 0 when the XRPL leg is unavailable.
@@ -418,5 +534,13 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     /// @notice The live XRP/USD the contract would use right now. Call it with eth_call from the UI.
     function currentXrpUsd() external returns (uint256 price, int8 decimals) {
         return _xrpUsd();
+    }
+
+    /**
+     * @dev Production path is Flare's own verification contract, the same one RevenueOracle uses for
+     * Web2Json. Overridden in tests, where no FDC exists to attest against.
+     */
+    function _verifyPayment(IPayment.Proof calldata proof) internal view virtual returns (bool) {
+        return ContractRegistry.getFdcVerification().verifyPayment(proof);
     }
 }
