@@ -82,12 +82,33 @@ signed an EVM transaction to receive it, and would not need an EVM wallet at all
 their behalf. The revenue was proven from a Web2 API, underwritten on Flare, and settled on a chain with no
 smart contracts of its own.
 
-> Those five transactions were run against the deployment listed below before `RevenueOracle` was extended to
+> Those five transactions were run against an earlier deployment, before `RevenueOracle` was extended to
 > record the FDC voting round and Merkle root on each figure — the data the interface needs to show its work.
-> The contracts were then redeployed and the revenue re-attested at
-> [`0xede1d3f8…`](https://coston2-explorer.flare.network/tx/0xede1d3f8bcb4292c928a59f6f4fb45aac43c76e5b9d0ac8a321b5004dfeb33b6):
-> **$3,916.78**, FDC round **1,419,988**, Merkle root `0x4db0a6fe…39b2`. The five above remain exactly what
-> happened; they simply predate that field.
+> The contracts were then redeployed. The five above remain exactly what happened; they simply predate that
+> field.
+
+The current `RevenueOracle` at [`0x80D08369…`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code)
+holds two periods, both attested from live Stripe API calls:
+
+| Period ending | Proven | FDC round | Merkle root | |
+|---|---|---|---|---|
+| 2026-08-08 | **$3,916.78** | 1,419,988 | `0x4db0a6fe…39b2` | [`0xede1d3f8…`](https://coston2-explorer.flare.network/tx/0xede1d3f8bcb4292c928a59f6f4fb45aac43c76e5b9d0ac8a321b5004dfeb33b6) |
+| 2026-08-11 | **$3,916.78** | 1,422,337 | `0xf951aaa7…` | [`0x8abab9c3…`](https://coston2-explorer.flare.network/tx/0x8abab9c34593df83554f8f43a4fed3e06bea898695eca1ad9971b32b258b15a7) |
+
+Both windows cover the same three Stripe charges, so they prove the same figure — the second is a fresh
+attestation, not a second month of trading. That run was timed end to end at **122 seconds**.
+
+### Checking these claims
+
+Every transaction linked in this README and in `docs/` can be checked against the chain in one command:
+
+```bash
+npx hardhat run scripts/ledgerline/verify-claims.ts --network coston2
+```
+
+It resolves each hash, reports which contract it was sent to and whether it succeeded, and exits non-zero if
+any claim is not backed by the chain. It is here because the fastest way to lose a reviewer's trust is a
+document that claims more than the chain can support.
 
 ## Deployed on Coston2 (chain id 114)
 

@@ -25,13 +25,20 @@ const NAMED: Record<string, string> = {
 };
 
 async function main() {
+    /*
+     * Only hashes published as explorer transaction links are treated as claims that a transaction exists.
+     * Merkle roots and account ids are the same shape and appear all over these documents; calling one of
+     * those a missing transaction would be a false alarm, and a checker that cries wolf gets ignored.
+     */
+    const TX_LINK = /coston2-explorer\.flare\.network\/tx\/(0x[0-9a-fA-F]{64})/g;
+
     const claimed = new Map<string, string[]>();
     for (const file of FILES) {
         const full = path.join(ROOT, file);
         if (!fs.existsSync(full)) continue;
         const text = fs.readFileSync(full, "utf8");
-        for (const m of text.matchAll(/0x[0-9a-fA-F]{64}/g)) {
-            const hash = m[0].toLowerCase();
+        for (const m of text.matchAll(TX_LINK)) {
+            const hash = m[1].toLowerCase();
             claimed.set(hash, [...(claimed.get(hash) ?? []), file]);
         }
     }
@@ -44,13 +51,8 @@ async function main() {
         const receipt = await ethers.provider.getTransactionReceipt(hash);
 
         if (!receipt) {
-            // Not every 64-hex string in the docs is a transaction — Merkle roots and account ids look the
-            // same. Say which it is rather than calling a root a missing transaction.
-            const asBlock = await ethers.provider.getTransaction(hash);
-            console.log(`  NOT A TRANSACTION  ${hash}`);
-            console.log(`                     cited in ${where}`);
-            console.log(`                     (a Merkle root or account id would look like this too)`);
-            if (asBlock) bad++;
+            console.log(`  MISSING  ${hash}`);
+            console.log(`           linked as a transaction in ${where}, but the chain has no such transaction`);
             bad++;
             continue;
         }

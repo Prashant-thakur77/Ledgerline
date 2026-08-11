@@ -29,24 +29,46 @@ Stripe tab. Three charges, $4,030 gross, **$3,912.23 net** after fees.
 > This is a real Stripe account. Nothing here is mocked — the API responses are genuine, the money behind them
 > is test mode.
 
-### 1:00 — Prove it on chain
+### 1:00 — Prove it on chain, from the page
 
-Run it live, and let the wait be visible rather than cut:
+**Do this in the browser, not the terminal.** Press **Run an attestation** and let the console fill in. This is
+the strongest ninety seconds in the video — do not cut it and do not speed it up.
 
-```bash
-REVENUE_SOURCE=stripe ACCOUNT_REF=acct_1U2HbaRh1zuX9OfD \
-  yarn hardhat run scripts/ledgerline/attest-revenue.ts --network coston2
-```
+> I'm going to prove that figure on chain right now, and you can watch the whole thing.
 
-While the voting round finalises, show the jq on screen and say what it does:
+Narrate the lines as they arrive, because each one is checkable:
 
-> This filter is the whole trick. Every data provider on Flare runs it independently against Stripe's response,
-> and they have to agree on the answer. It sums the net amount of charges in the period — net, so it's after
-> Stripe's fees, the money the business actually keeps.
+- *composing a Web2Json request* — put the jq on screen here.
+  > This filter is the whole trick. Every data provider on Flare runs it independently against Stripe's
+  > response, and they have to agree on the answer. It sums the net amount of charges in the period — net, so
+  > it's after Stripe's fees, the money the business actually keeps.
+- *request submitted* — click the transaction link.
+- *landed in voting round 1,4xx,xxx* — **click through to Flare's systems explorer.** This is the moment.
+  > That's not our server. That's Flare's own explorer, showing the round my request is sitting in.
+- *1 round on, not relayed yet* — this is where most demos would show a spinner.
+  > This wait is the product. Two minutes, because a voting round has to close and be relayed before a proof
+  > exists. Every other project hides this behind a spinner, and hiding it is exactly what makes an oracle look
+  > like an ordinary database call. You cannot fake a voting round finalising while someone watches.
+- *round finalised · Merkle root 0x…* — the root appears the instant it is relayed.
+- *proof retrieved · 5 Merkle siblings*
+- *the network agreed: stripe/acct_… earned $3,916.78*
+- *verified on chain* — click it.
 
-When it lands: **$3,912.23 proven on chain**. Show the transaction, and point at the contract that verified it.
+> The contract checked that Merkle proof against Flare's own verification contract before it stored anything.
+> A forged figure does not get in.
 
-> The contract checked a Merkle proof before it stored anything. A forged figure doesn't get in.
+Then the figure resolves in on the page above, and the proof line types itself in underneath.
+
+**If you are short on time or the network is slow**, the same run is already on chain and can be narrated
+instead — request [`0x2d7a5eeb…`](https://coston2-explorer.flare.network/tx/0x2d7a5eebd1ad572e807249145ba64a963ac737a030693335efbb44dbb945b1b9),
+round 1,422,334, stored at [`0x3abedd85…`](https://coston2-explorer.flare.network/tx/0x3abedd85adb5e6a5747d62061b80f5ba24a5017619acb44153b95ab0d9988b64).
+It took 116 seconds end to end.
+
+**Worth saying out loud**, because it is the part that is hard to believe:
+
+> Nothing about this runs on our server. The page is doing the waiting, and your wallet signs both
+> transactions. Which means you can do this yourself, right now, on the deployed site — pick *Yours*, and
+> you'll be attesting against an account bound to your own wallet.
 
 ### 1:50 — The limit appears
 
