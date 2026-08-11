@@ -54,6 +54,12 @@ const STAGES: Stage[] = [
         detail: "Each newly proven period repays a fixed share of itself. Nobody has to remember to pay; a proven period is the trigger.",
         flare: "FDC · FTSOv2",
     },
+    {
+        title: "Or the borrower repays in XRP",
+        detail: "A plain XRP payment, carrying the account id in its memo, proven on Flare by a second FDC attestation type. Funded in real XRP, repaid in real XRP — the obligation never leaves Flare, and the borrower never needs an EVM asset in either direction.",
+        flare: "FDC · Payment",
+        attested: true,
+    },
 ];
 
 export function Mechanism() {

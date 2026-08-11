@@ -369,8 +369,9 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
      * at all. The obligation being settled still lives on Flare and is still denominated in dollars.
      *
      * The borrower sends an ordinary Payment to `xrplTreasuryAddress` carrying `accountId` as the
-     * transaction's payment reference, which on the XRP Ledger is the `InvoiceID` field. That reference is
-     * what ties an otherwise anonymous payment to a specific obligation.
+     * transaction's payment reference. On the XRP Ledger that means exactly one memo whose `MemoData` is
+     * this 32-byte value — not the `InvoiceID` field, which looks like the obvious place for it and is not
+     * read by FDC at all. That reference is what ties an otherwise anonymous payment to one obligation.
      *
      * This is a second FDC attestation type: revenue arrives through Web2Json, repayment through Payment.
      * The same Merkle proof machinery verifies both.

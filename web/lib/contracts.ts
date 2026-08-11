@@ -154,7 +154,35 @@ export const managerAbi = [
         ],
         outputs: [],
     },
+    /**
+     * The XRPL account a borrower repays to. Empty when the XRPL repayment leg is not configured, which is
+     * how the interface decides whether to offer it at all.
+     */
+    {
+        type: "function",
+        name: "xrplTreasuryAddress",
+        stateMutability: "view",
+        inputs: [],
+        outputs: [{ type: "string" }],
+    },
+    {
+        type: "function",
+        name: "xrpDropsToUsdCents",
+        stateMutability: "pure",
+        inputs: [
+            { name: "drops", type: "uint256" },
+            { name: "price", type: "uint256" },
+            { name: "priceDecimals", type: "int8" },
+        ],
+        outputs: [{ type: "uint256" }],
+    },
 ] as const;
+
+/** One XRP is a million drops. */
+export const DROPS_PER_XRP = 1_000_000n;
+
+/** Where an XRPL transaction can be inspected. */
+export const xrplTxUrl = (hash: string) => `${XRPL_EXPLORER}/transactions/${hash}`;
 
 export const XRPL_EXPLORER = "https://testnet.xrpl.org";
 

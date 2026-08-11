@@ -168,7 +168,8 @@ resulting record to their wallet.
 
 ## How Flare is used
 
-Three Flare systems do load-bearing work here. Removing any one does not degrade the product; it deletes it.
+Three Flare systems do load-bearing work here, and FDC does it twice with two different attestation types.
+Removing any one does not degrade the product; it deletes it.
 
 **FDC Web2Json is the underwriting.** It is the only reason this product can exist on chain at all. It calls
 Stripe, reduces the response with a jq filter that every data provider runs independently, and delivers the
@@ -190,9 +191,18 @@ borrower's XRP Ledger account** by a FAssets agent. **Without it there is no XRP
 can hold at all** — XRP has no native smart contract capability — and without redemption the borrower would be
 stuck holding a wrapped asset on a chain they never asked to use.
 
-This is what makes the interoperability claim complete rather than merely defensible: data crosses from Web2
-into Flare's EVM state via FDC, and value crosses from Flare back out to the XRP Ledger via FAssets. The
-borrower's side of the transaction happens entirely on a chain that cannot run any of this logic itself.
+**FDC Payment closes the loop back from the XRP Ledger.** `repayFromXrpl` accepts an FDC *Payment* proof —
+a second attestation type, verified by the same Merkle machinery — that a plain XRP payment reached the
+contract's XRPL account carrying the account id as its payment reference. **Without it, money could leave
+Flare for the XRP Ledger but nothing could come back**, and a borrower funded in real XRP would still have
+had to acquire an EVM asset to repay. The contract checks the chain, the recipient, the reference and the
+proof before it will reduce a debt, and refuses a payment it has already counted.
+
+This is what makes the interoperability claim complete rather than merely defensible. Data crosses from Web2
+into Flare's EVM state through FDC Web2Json. Value crosses out to the XRP Ledger through FAssets. Value
+crosses back through FDC Payment. The obligation itself never leaves Flare and is never denominated in
+anything but dollars — while the borrower's side of every transaction happens on a chain that cannot run a
+line of this logic itself.
 
 ## What was built during the hackathon
 
@@ -376,6 +386,17 @@ is surprising the first time. And `eth_estimateGas` under-estimates a FAssets re
 redemption ticket queue, so the transaction fails with `gasUsed == gasLimit` while a `staticCall` succeeds —
 a genuinely confusing failure that an explicit gas limit fixes.
 
+**The trap that cost the most, and would catch anyone.** On the XRP Ledger, `standardPaymentReference` — the
+field that ties a payment to an obligation — comes **only** from a memo, and only when the transaction carries
+*exactly one* memo whose `MemoData` is *exactly* 32 bytes of hex. `InvoiceID` is a 256-bit field on an XRPL
+Payment that looks precisely like the field intended for this, and FDC does not read it at all. Using it does
+not error: the attestation succeeds, every other field is correct, and `standardPaymentReference` comes back
+as thirty-two zero bytes. We only caught it by attesting a real payment and printing the decoded response
+before wiring the contract up to it — the transaction that failed this way is
+[`DF329F2E…`](https://testnet.xrpl.org/transactions/DF329F2E8BEE8A28E852779435FE3420651505608B1542D60A8213801AC9BF16),
+and it is worth keeping as a record of what the failure looks like. A one-line warning next to the field
+definition would save the next team a day.
+
 **What would have helped most.** A note in the FDC documentation that the attestation request, including its
 `headers` field, is permanently public calldata. It is obvious in hindsight and consequential: any design
 that attests an authenticated API is publishing that credential. We handled it with a read-only restricted
@@ -390,17 +411,51 @@ key and a guard that refuses an `sk_` key outright, but it deserves a warning at
    direction. It has 19 tests covering the conversion, overpayment, replay, wrong chain, wrong recipient,
    wrong reference and an unverified proof.
 
-   **It is not in the deployed contract.** The `AdvanceManager` address below predates it. Deploying it means
-   a new address and a re-funded treasury, which is queued behind a faucet claim rather than done in a hurry
-   before a deadline — so the honest status is: the code exists and passes tests, and the chain has not seen
-   it yet. Nothing in this README's evidence section depends on it.
-2. **Advances below one lot on the XRPL leg.** FAssets redeems whole lots only, 10 XRP on Coston2, so the
+   **The attestation half is proven on real infrastructure**, even though the contract is not yet deployed.
+   A genuine XRPL testnet payment was sent, attested by FDC, and the decoded response checked field by field
+   against what `repayFromXrpl` requires:
+
+   | | |
+   |---|---|
+   | XRPL payment, 5 XRP, memo carrying the account id | [`F229BC43…`](https://testnet.xrpl.org/transactions/F229BC43D7596E6239AD72BE0E354F09770F57BB01BF223C96D21BBF8E6D45C2) |
+   | FDC voting round | 1,422,353, proof of 3 Merkle siblings |
+   | `standardPaymentReference` | `0xc60c21e2…6d77` — equal to the account id |
+   | `receivingAddressHash` | matches `keccak256` of the treasury address |
+   | `status` | 0, success |
+
+   Every field the contract checks is correct, so the proof would be accepted.
+
+   **What is not done is the deployment.** The `AdvanceManager` address below predates this function, and
+   putting it on chain means a new address and a re-funded treasury — queued behind a faucet claim rather
+   than rushed before a deadline. The honest status: the mechanism is verified against the real network, the
+   contract logic has 19 tests, and the two have not yet been introduced to each other. Nothing else in this
+   README depends on it.
+2. **Flare Smart Accounts, so the borrower needs no EVM wallet at all.** This is the natural next step, and
+   it is Flare's own newest work rather than something we would have to invent.
+
+   [Flare Smart Accounts](https://github.com/flare-foundation/flare-smart-accounts) pairs every XRPL address
+   with a deterministic `PersonalAccount` contract on Flare that only that address can control, and the
+   authorisation is exactly what `repayFromXrpl` already uses: an FDC **Payment** proof of a transaction the
+   XRPL address signed. Its
+   [`PaymentProofs.verifyPayment`](https://github.com/flare-foundation/flare-smart-accounts/blob/main/docs/specs/SmartAccounts/PaymentProofs.md)
+   checks the same fields in the same order our function does — chain, then status, then recipient against an
+   allowlist, then the proof itself last because it is the expensive one.
+
+   Today a borrower still needs an EVM wallet to *request* an advance, even though both money legs can be
+   pure XRP. Routing the request through a Personal Account removes that last dependency: they would send one
+   XRP payment carrying an instruction, and a Flare account they provably control would take the advance on
+   their behalf. It is deployed on Coston2 at
+   [`0x434936d4…`](https://coston2-explorer.flare.network/address/0x434936d47503353f06750Db1A444DBDC5F0AD37c),
+   and the starter this repository is built on already ships a working example of driving it from an XRPL
+   payment. **Not built** — it is a larger change than three days allows, and shipping it badly would be
+   worse than naming it precisely.
+3. **Advances below one lot on the XRPL leg.** FAssets redeems whole lots only, 10 XRP on Coston2, so the
    smallest XRPL-settled advance is about $10. Smaller advances work on the FXRP leg. Batching or a float
    would close the gap.
-3. **A second platform.** Shopify or YouTube. The oracle already takes `platform` as a field and `accountRef`
+4. **A second platform.** Shopify or YouTube. The oracle already takes `platform` as a field and `accountRef`
    as opaque, so this is an entry in `revenue-sources.ts` and no contract change.
-4. **A lender side.** The treasury is a single owner-funded pool today. Real capital needs LP shares, a yield
+5. **A lender side.** The treasury is a single owner-funded pool today. Real capital needs LP shares, a yield
    split and default accounting.
-5. **Underwriting that uses the trend.** The full history is stored and currently only averaged. Growth,
+6. **Underwriting that uses the trend.** The full history is stored and currently only averaged. Growth,
    volatility and seasonality are all visible in it.
-6. **Per-borrower key scoping**, so the published key reads one account's aggregate and nothing else.
+7. **Per-borrower key scoping**, so the published key reads one account's aggregate and nothing else.

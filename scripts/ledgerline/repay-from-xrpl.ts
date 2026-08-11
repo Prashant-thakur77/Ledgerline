@@ -86,16 +86,21 @@ async function main() {
     console.log("Paying from  :", wallet.address);
 
     /*
-     * InvoiceID is a 256-bit field on an XRPL Payment, and it is exactly what FDC surfaces as
-     * `standardPaymentReference`. Putting the accountId there is what ties an otherwise anonymous XRP
-     * payment to one specific obligation on Flare.
+     * The accountId travels in the memo, and that is what ties an otherwise anonymous XRP payment to one
+     * specific obligation on Flare.
+     *
+     * FDC's rule for the XRP Ledger is narrow and worth stating exactly, because getting it wrong fails
+     * silently: `standardPaymentReference` is set only when the transaction carries **exactly one** memo
+     * whose `MemoData` is a hex string of **exactly 32 bytes**. Any other shape — two memos, a shorter
+     * memo, or the `InvoiceID` field, which looks like the obvious place for this and is not read at all —
+     * leaves the reference as thirty-two zero bytes, and the payment cannot be matched to a debt.
      */
     const prepared = await client.autofill({
         TransactionType: "Payment",
         Account: wallet.address,
         Destination: treasuryAddress,
         Amount: xrpToDrops(XRP_AMOUNT),
-        InvoiceID: accountId.slice(2).toUpperCase(),
+        Memos: [{ Memo: { MemoData: accountId.slice(2).toUpperCase() } }],
     });
 
     const signed = wallet.sign(prepared);

@@ -101,6 +101,15 @@ export default function Page() {
         functionName: "repaymentShareBps",
     });
     const { data: lot } = useReadContract({ address: MANAGER_ADDRESS, abi: managerAbi, functionName: "lotSize" });
+    /*
+     * Empty on a deployment that predates the XRPL repayment leg, which is exactly how the interface decides
+     * whether to offer that route at all.
+     */
+    const { data: xrplTreasury } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "xrplTreasuryAddress",
+    });
 
     const { data: priceSim } = useSimulateContract({
         address: MANAGER_ADDRESS,
@@ -574,6 +583,35 @@ export default function Page() {
                             the figure fall.
                         </p>
                     </div>
+
+                    {/*
+                     * Only rendered when the deployed contract actually has an XRPL treasury configured. The
+                     * read simply comes back empty on a deployment without it, and the section disappears —
+                     * better than describing a route a judge would find reverts.
+                     */}
+                    {xrplTreasury && (
+                        <div className="block">
+                            <p style={{ marginTop: 0 }}>
+                                Or repay in <strong>real XRP, from the XRP Ledger</strong>. Send an ordinary
+                                payment to the account below, carrying this account id as the payment reference,
+                                and an FDC <span className="mono">Payment</span> attestation proves it on Flare —
+                                a second attestation type, verified the same way the revenue was.
+                            </p>
+                            <div className="row">
+                                <span>Pay to</span>
+                                <span className="mono break">{xrplTreasury}</span>
+                            </div>
+                            <div className="row">
+                                <span>Memo, exactly 32 bytes</span>
+                                <span className="mono break">{accountId}</span>
+                            </div>
+                            <p className="quiet" style={{ marginTop: 14, marginBottom: 0 }}>
+                                The reference has to be a single memo of exactly that value — the XRP
+                                Ledger&apos;s <span className="mono">InvoiceID</span> field looks like the right
+                                place and FDC does not read it. Neither leg of this route needs an EVM asset.
+                            </p>
+                        </div>
+                    )}
                 </>
             )}
 
