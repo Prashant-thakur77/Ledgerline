@@ -1,5 +1,18 @@
 # Putting the interface on the public internet
 
+**Deployed at [ledgerline-flare.vercel.app](https://ledgerline-flare.vercel.app)** — Vercel project
+`ledgerline`, production alias set with `vercel alias`.
+
+> **The one thing that is easy to get wrong.** A new Vercel project has **Deployment Protection** enabled by
+> default, and a protected deployment still answers `200` — with Vercel's login page. Curling for a status
+> code will tell you everything is fine while a visitor sees "Log in to Vercel". Check the *body*, not the
+> code: `curl -s <url> | grep -c "Log in to Vercel"` should print `0`. Turn it off under
+> *Settings → Deployment Protection → Vercel Authentication → Disabled*.
+>
+> Also worth checking: `<project>.vercel.app` is claimed globally, not per account. `ledgerline.vercel.app`
+> belongs to an unrelated company, so this project uses `ledgerline-flare.vercel.app`. Fetch a candidate URL
+> and read what it serves before publishing it anywhere.
+
 The app is a self-contained Next.js project in [`web/`](../web). It talks to Coston2 over a public RPC and to
 two Flare services through short server-side proxies, so there is nothing to host besides the app itself — no
 database, no indexer, no background worker.

@@ -4,6 +4,16 @@
 
 Flare Summer Signal · Bounty 1, Interoperable Asset Products · Coston2
 
+### ▸ [ledgerline-flare.vercel.app](https://ledgerline-flare.vercel.app)
+
+Live on Coston2, chain id 114. Nothing to install and no account needed to read it.
+
+**You can run a real FDC attestation yourself.** Connect any wallet on Coston2, choose *Yours*, and press
+*Run an attestation*. The page composes a Web2Json request, pays the FdcHub fee, tells you which voting
+round it landed in with a link to Flare's own systems explorer, counts the rounds until it is relayed,
+prints the Merkle root the moment it exists, retrieves the proof and stores it on chain — about two minutes,
+narrated line by line. Your wallet signs; our server signs nothing.
+
 ---
 
 ## Where the code is
