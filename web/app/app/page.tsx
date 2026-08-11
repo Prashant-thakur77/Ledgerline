@@ -27,6 +27,7 @@ import { ProofLine, short } from "../components/ProofLine";
 import { Mechanism } from "../components/Mechanism";
 import { ProveRevenue } from "../components/ProveRevenue";
 import { Connect } from "../components/Connect";
+import { ProtocolStrip, ActivityFeed } from "../components/Activity";
 import { AppHeader } from "../components/AppHeader";
 import { Grain } from "../components/Chrome";
 
@@ -241,6 +242,10 @@ export default function Page() {
                     anything.
                 </p>
 
+                {/* Shown before connecting too: what the protocol has done is public, and a visitor
+                    deciding whether to trust this should not have to connect a wallet to see it. */}
+                <ProtocolStrip />
+
                 {newest && (
                     <>
                         <h2>A real account, right now</h2>
@@ -264,6 +269,9 @@ export default function Page() {
 
                 <h2>How it works</h2>
                 <Mechanism />
+
+                <h2>What this account has done</h2>
+                <ActivityFeed accountId={accountId} />
 
                 <h2>Connect</h2>
                 <Connect />
@@ -316,6 +324,8 @@ export default function Page() {
                     </div>
                 </div>
             )}
+
+            <ProtocolStrip />
 
             <h2>Whose revenue</h2>
             <div className="block">
@@ -610,6 +620,9 @@ export default function Page() {
                     )}
                 </>
             )}
+
+            <h2>This account&apos;s history</h2>
+            <ActivityFeed accountId={accountId} />
 
             <h2>How it works</h2>
             <Mechanism />
