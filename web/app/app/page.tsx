@@ -28,6 +28,7 @@ import { Mechanism } from "../components/Mechanism";
 import { ProveRevenue } from "../components/ProveRevenue";
 import { Connect } from "../components/Connect";
 import { AppHeader } from "../components/AppHeader";
+import { Grain } from "../components/Chrome";
 
 const STRIPE_ACCOUNT_REF = process.env.NEXT_PUBLIC_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
 
@@ -227,8 +228,9 @@ export default function Page() {
         const newest = periods[periods.length - 1];
         return (
             <>
+            <Grain />
             <AppHeader />
-            <main>
+            <main className="app-main">
                 <h1>Connect a wallet to begin.</h1>
                 <p className="lede">
                     Everything below is already live on Coston2 and readable without connecting. A wallet is
@@ -289,8 +291,9 @@ export default function Page() {
 
     return (
         <>
+        <Grain />
         <AppHeader account={address} onDisconnect={() => disconnect()} />
-        <main>
+        <main className="app-main">
             <h1>Ledgerline</h1>
             <div className="row" style={{ padding: 0 }}>
                 <span className="mono">
