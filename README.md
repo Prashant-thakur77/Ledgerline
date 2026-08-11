@@ -6,6 +6,24 @@ Flare Summer Signal · Bounty 1, Interoperable Asset Products · Coston2
 
 ---
 
+## Where the code is
+
+This repository is a fork of the [flare-hardhat-starter](https://github.com/flare-foundation/flare-hardhat-starter),
+so most of what you see is the starter's own examples, untouched. **Everything written for this hackathon is in
+these six places:**
+
+| Path | What it is |
+|---|---|
+| [`contracts/ledgerline/`](contracts/ledgerline/) | The two contracts. ~330 lines of Solidity, both source-verified on chain. |
+| [`test/`](test/) | 46 tests. `RevenueOracle` (13), `AdvanceManager` (23), `AdvanceToXrpl` (10). |
+| [`scripts/ledgerline/`](scripts/ledgerline/) | Deploy, attest, borrow, repay, redeem to XRPL, and a one-screen state dump. |
+| [`web/app/`](web/app/) | The interface, including the live attestation console and its two API routes. |
+| [`web/lib/`](web/lib/) | The Flare protocol layer the browser drives an attestation with. |
+| [`docs/`](docs/) | Phase 0 validation, deployment record, demo script, blockers. |
+
+Nothing else in the repository was modified. The starter's examples were used only to validate the
+environment in Phase 0 and are left exactly as they came.
+
 ## The problem
 
 Revenue based financing is a large offchain industry. Pipe, Capchase and Wayflyer advance money against
@@ -108,6 +126,25 @@ cd web && npm install && npm run dev      # the interface, on :3000
 `REVENUE_SOURCE=demo` runs the same pipeline against a keyless public endpoint, so the whole flow can be
 demonstrated without a Stripe account.
 
+`npx hardhat run scripts/ledgerline/state.ts --network coston2` prints the whole live position in one screen —
+balances, treasury, every proven period, the limit, the FTSO price and any open advance. Run it before a demo.
+
+### The interface
+
+`web/` needs its own `.env.local`. Only one of these is a secret:
+
+```bash
+STRIPE_API_KEY=rk_test_…        # read-only restricted key; without it, only the sandbox source is offered
+VERIFIER_URL_TESTNET=https://fdc-verifiers-testnet.flare.network
+VERIFIER_API_KEY_TESTNET=00000000-0000-0000-0000-000000000000   # the documented public testnet key
+COSTON2_DA_LAYER_URL=https://ctn2-data-availability.flare.network
+LEDGERLINE_ACCOUNT_REF=acct_…   # the Stripe account this deployment may attest
+```
+
+`LEDGERLINE_ACCOUNT_REF` is pinned server-side deliberately: the Stripe key belongs to the deployment, so
+without it a visitor could attest our revenue under an account reference of their own choosing and bind the
+resulting record to their wallet.
+
 ## How Flare is used
 
 Three Flare systems do load-bearing work here. Removing any one does not degrade the product; it deletes it.
@@ -138,21 +175,85 @@ borrower's side of the transaction happens entirely on a chain that cannot run a
 
 ## What was built during the hackathon
 
-Everything in `contracts/ledgerline/`, `scripts/ledgerline/`, `test/` and `web/` is new. The repository is the
-[flare-hardhat-starter](https://github.com/flare-foundation/flare-hardhat-starter); its own examples are
-untouched and were used only to validate the environment in Phase 0.
+### What existed before
 
-- **`RevenueOracle.sol`** — verifies a Web2Json proof, derives account identity from the attested payload
-  rather than caller input, and stores revenue history. Guards replay, account mismatch, stale periods, and
-  a second wallet claiming an already bound account.
-- **`AdvanceManager.sol`** — underwriting, FTSO conversion, FXRP treasury, manual and revenue-triggered
-  repayment, delinquency.
-- **34 tests**, including the 3x price move and a case asserting the same price at 6 and 8 decimals yields the
-  same answer.
-- **`scripts/ledgerline/`** — attestation with round-waiting and progress, Stripe sandbox seeding, deployment
-  with explorer verification, and a per-platform jq registry.
-- **`web/`** — Next.js and wagmi interface.
-- **[docs/PHASE0.md](docs/PHASE0.md)** — the environment validation, with every address and encoding written down.
+Nothing. There was no prior product, no prior deployment and no prior users. The starting point was an
+unmodified clone of the [flare-hardhat-starter](https://github.com/flare-foundation/flare-hardhat-starter),
+and the only things carried across from it are its example contracts and its FDC helper utilities in
+[`scripts/utils/`](scripts/utils/), which are used as shipped.
+
+### What was newly built
+
+Every file listed in [Where the code is](#where-the-code-is) was written from scratch during the program.
+
+**Contracts** — [`contracts/ledgerline/`](contracts/ledgerline/)
+
+- **[`RevenueOracle.sol`](contracts/ledgerline/RevenueOracle.sol)** — verifies a Web2Json proof through
+  Flare's own `FdcVerification`, derives account identity from the attested payload rather than caller input,
+  and stores revenue history along with the voting round and the Merkle root the proof resolves to. Guards
+  replay, account mismatch, stale periods, and a second wallet claiming an already-bound account.
+- **[`AdvanceManager.sol`](contracts/ledgerline/AdvanceManager.sol)** — underwriting, FTSOv2 conversion, the
+  FXRP treasury, `requestAdvance`, `requestAdvanceToXrpl`, manual and revenue-triggered repayment, delinquency.
+
+**Tests** — [`test/`](test/), **46 passing**, `npx hardhat test`
+
+Includes a 3x XRP price move asserting the dollar obligation does not change, and a case running the same
+price at 6 and 8 decimals and demanding the same answer. Four mock contracts stub the FDC and FTSO calls that
+only exist on a live Flare network.
+
+**Scripts** — [`scripts/ledgerline/`](scripts/ledgerline/)
+
+Deployment with explorer verification, the attestation pipeline with round-waiting, a per-platform jq
+registry, Stripe sandbox seeding, the FXRP and XRPL legs, repayment, and a one-screen live state dump.
+
+**The interface, and the live attestation console** — [`web/`](web/)
+
+The part worth singling out. **The page runs a real FDC attestation from the browser and narrates it as it
+happens** — composing the request, paying the FdcHub fee, reporting which voting round it landed in with a
+link to Flare's systems explorer, counting the rounds until it is relayed, printing the Merkle root the moment
+it exists, retrieving the proof from the Data Availability layer, decoding it, and storing it on chain.
+
+An attestation takes a couple of minutes. Every project that uses FDC hides that behind a spinner, and hiding
+it is exactly what makes an oracle look like an ordinary database call. Printing it is the point: a voting
+round finalising is the one thing about this product that cannot be faked, and a sceptic can open the explorer
+links while it is still in flight and watch it happen.
+
+The path was measured end to end on Coston2 at **116 seconds** — 83 of them waiting for the round to be
+relayed — and the run is on chain:
+
+| | |
+|---|---|
+| Attestation requested from the browser path, round **1,422,334** | [`0x2d7a5eeb…`](https://coston2-explorer.flare.network/tx/0x2d7a5eebd1ad572e807249145ba64a963ac737a030693335efbb44dbb945b1b9) |
+| Round relayed, Merkle root `0x20266de8…c15a8`, proof of 5 siblings retrieved and verified on chain | [`0x3abedd85…`](https://coston2-explorer.flare.network/tx/0x3abedd85adb5e6a5747d62061b80f5ba24a5017619acb44153b95ab0d9988b64) |
+
+The whole loop lives in the browser deliberately —
+[`web/lib/useAttestation.ts`](web/lib/useAttestation.ts) drives it, and the two server routes it calls
+([`prepare`](web/app/api/attest/prepare/route.ts), [`proof`](web/app/api/attest/proof/route.ts)) are short
+proxies that exist only because the FDC verifier is not CORS-open and the Stripe key must not ship in the
+JavaScript bundle. Nothing waits on the server, so there is no long-running function to time out and the page
+behaves identically locally and deployed.
+
+A visitor can run the whole thing themselves against an account bound to their own wallet, using a keyless
+public endpoint in place of a payment processor — same verifier, same voting round, same Merkle proof, same
+on-chain verification. That path is labelled as a stand-in figure rather than revenue, because it is one.
+
+**Docs** — [`docs/`](docs/)
+
+[PHASE0.md](docs/PHASE0.md) records the environment validation with every address and encoding written down,
+[DEPLOYED.md](docs/DEPLOYED.md) the deployment and the full path run on chain, [DEMO.md](docs/DEMO.md) the
+video script, and [BLOCKERS.md](docs/BLOCKERS.md) what went wrong and what is still unresolved.
+
+### What was integrated or improved
+
+- **FDC Web2Json** integrated against a real authenticated third-party API (Stripe), not a public demo
+  endpoint — including working out that Stripe payouts are unreachable in test mode and that balance
+  transactions are the better basis anyway.
+- **FAssets** integrated in the redemption direction, so an advance settles as real XRP on the XRP Ledger.
+- **FTSOv2** integrated as the denomination layer, with the decimal handling that a 6-decimal XRP/USD feed and
+  a 6-decimal FXRP actually require.
+- The starter's FDC helpers were **reimplemented for the browser** in [`web/lib/flare.ts`](web/lib/flare.ts):
+  the originals depend on Hardhat's runtime and Truffle-style artifacts, so the voting-round arithmetic,
+  the registry lookups and the proof retrieval were rewritten against viem to run client-side.
 
 ## Honesty notes
 
@@ -211,6 +312,53 @@ image hash matching across TEE machines, and to version mismatches between `tee-
 that risk with a complete, working, deployed product five days from the deadline would be a bad trade. The
 honest move is to name the weakness, show that the fix is understood and specified, and ship the thing that
 works.
+
+## Network, testing and what has actually been exercised
+
+**Network.** Coston2, Flare's EVM testnet, chain id 114. The XRP Ledger leg settles on XRPL testnet. Nothing
+is deployed to mainnet and nothing here involves real money.
+
+**Automated tests.** 46, `npx hardhat test`, covering both contracts. The ones worth naming: a 3x XRP price
+move asserting the dollar obligation does not change; the same price supplied at 6 and 8 decimals demanding
+the same answer; replay, account-mismatch, stale-period and wrong-owner guards on the oracle; and the XRPL
+redemption leg against a mock asset manager.
+
+**Manually exercised on chain**, not just in tests: attestation from a real authenticated Stripe API call,
+underwriting, an FXRP advance, a revenue-triggered repayment, a FAssets redemption that put real XRP in an
+XRP Ledger account, and — most recently — the complete attestation path that the browser drives, measured at
+116 seconds. Every one of those has a transaction hash in this README.
+
+**Users.** None yet, and it would be dishonest to imply otherwise. The product has been run end to end only
+by its author. The sandbox source exists precisely so that a stranger can run the whole loop against an
+account bound to their own wallet without needing a Stripe account or anything from us, which is the first
+step towards that changing.
+
+**Known gaps.** The treasury needs refunding from the faucet before an advance can be issued on the live
+deployment; the interface says so plainly rather than letting the button revert. Underwriting has so far run
+on a single proven period. Neither is a code change.
+
+## Feedback on building on Flare
+
+Not required for this hackathon, but worth writing down while it is fresh.
+
+**What worked well.** `ContractRegistry` is genuinely good — one address on every network, and everything else
+resolves from it, which is why this app can look up FdcHub and the Relay at runtime instead of hard-coding a
+deployment. The Web2Json attestation type is more general than it first appears: because the jq runs inside
+the verifier, adding a platform is a filter, not a contract change. FAssets redemption did what it claims,
+including paying out to an address on a chain with no smart contracts.
+
+**What cost the most time.** Three things, all of them decimals or documentation rather than concepts.
+XRP/USD reports 6 decimals on Coston2 while FLR/USD reports 8, and FXRP is 6 rather than 18 — anything that
+assumes 18 is wrong by a factor of 10^12, and nothing warns you. `FtsoV2.getFeedById` is `payable` rather than
+`view`, so a price read cannot sit behind a view function and the interface has to simulate it instead, which
+is surprising the first time. And `eth_estimateGas` under-estimates a FAssets redemption because it walks the
+redemption ticket queue, so the transaction fails with `gasUsed == gasLimit` while a `staticCall` succeeds —
+a genuinely confusing failure that an explicit gas limit fixes.
+
+**What would have helped most.** A note in the FDC documentation that the attestation request, including its
+`headers` field, is permanently public calldata. It is obvious in hindsight and consequential: any design
+that attests an authenticated API is publishing that credential. We handled it with a read-only restricted
+key and a guard that refuses an `sk_` key outright, but it deserves a warning at the point of use.
 
 ## Roadmap
 

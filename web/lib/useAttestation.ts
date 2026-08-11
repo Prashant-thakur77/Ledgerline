@@ -24,11 +24,13 @@ import {
 /**
  * Runs a complete FDC attestation from the browser and narrates it.
  *
- * This is the part of the product that is normally hidden. An attestation takes three to five minutes —
- * the request has to land in a voting round, that round has to close, two more have to pass before it is
- * relayed, and then the Data Availability layer builds the Merkle proof. Most projects put a spinner over
- * that and hope. Showing it instead is the point: every line below is a real network fact, with a link a
- * judge can open while it is still happening, and the wait is the evidence that nobody is faking the number.
+ * This is the part of the product that is normally hidden. An attestation takes a couple of minutes — the
+ * request has to land in a voting round, that round has to close and be relayed, and then the Data
+ * Availability layer builds the Merkle proof. Most projects put a spinner over that and hope. Showing it
+ * instead is the point: every line below is a real network fact, with a link a judge can open while it is
+ * still happening, and the wait is the evidence that nobody is faking the number.
+ *
+ * Measured end to end on Coston2: 116 seconds, of which 83 were waiting for the round to be relayed.
  *
  * The whole loop lives in the browser deliberately. The two server routes it calls are short proxies, so
  * there is no long-running function to time out and the page works the same locally and deployed.

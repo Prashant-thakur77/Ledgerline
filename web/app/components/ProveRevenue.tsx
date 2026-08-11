@@ -7,10 +7,12 @@ import { AttestationConsole } from "./AttestationConsole";
 /**
  * Runs a real FDC attestation from the page, and shows it happening.
  *
- * The wait is deliberately not hidden. An attestation takes three to five minutes because a voting round has
+ * The wait is deliberately not hidden. An attestation takes a couple of minutes because a voting round has
  * to close and be relayed before a proof exists, and that is the one thing about this product a sceptic
  * cannot dismiss: you can fake a number in a database, but you cannot fake a Flare voting round finalising
  * while someone watches the explorer. So the latency is presented as the evidence rather than apologised for.
+ *
+ * Measured end to end on Coston2: 116 seconds, of which 83 were waiting for the round to be relayed.
  */
 
 /** A month, fixed by the caller rather than computed inside the jq, which has to be deterministic. */
@@ -83,9 +85,9 @@ export function ProveRevenue({
             </p>
 
             <p className="quiet">
-                Expect three to five minutes. The request has to land in a 90-second voting round, that round has to
-                close, two more have to pass before it is relayed, and then the Data Availability layer builds the
-                Merkle proof. Two wallet signatures: one to submit the request, one to store the verified result.
+                Expect around two minutes, occasionally four. The request has to land in a 90-second voting round,
+                that round has to close and be relayed, and then the Data Availability layer builds the Merkle
+                proof. Two wallet signatures: one to submit the request, one to store the verified result.
             </p>
 
             {blocked ? (

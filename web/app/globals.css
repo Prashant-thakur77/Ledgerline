@@ -210,8 +210,10 @@ td.num,
     }
 
     .row > span:last-child,
-    .row > a:last-child {
+    .row > a:last-child,
+    .row > button:last-child {
         text-align: left;
+        align-self: start;
     }
 }
 
@@ -640,21 +642,12 @@ input::placeholder {
     }
 }
 
-/* Sections arrive in reading order rather than all at once. One pass, on mount only. */
-@keyframes riseIn {
-    from {
-        opacity: 0;
-        transform: translateY(6px);
-    }
-    to {
-        opacity: 1;
-        transform: none;
-    }
-}
-
-.rise {
-    animation: riseIn 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
-}
+/*
+ * There is deliberately no entrance animation on the page itself. A staggered reveal would mean text is
+ * invisible until a timer says otherwise, which costs real robustness — a slow frame, a captured
+ * screenshot, a printed page — and buys nothing a reader can use. Everything that moves here moves because
+ * a network fact changed.
+ */
 
 .fresh .amount {
     animation: settle 1.1s ease-out both;

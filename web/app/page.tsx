@@ -232,12 +232,12 @@ export default function Page() {
         const newest = periods[periods.length - 1];
         return (
             <main>
-                <h1 className="rise">Borrow against revenue you can prove.</h1>
-                <p className="lede rise" style={{ animationDelay: "60ms" }}>
+                <h1>Borrow against revenue you can prove.</h1>
+                <p className="lede">
                     Your payment processor already knows you earn four thousand dollars a month. No lender can read
                     it, so no lender will price it.
                 </p>
-                <p className="rise" style={{ animationDelay: "120ms" }}>
+                <p>
                     Flare&apos;s Data Connector reads it instead. It calls the API, the network&apos;s own data
                     providers agree on the answer, and the figure arrives on chain with a Merkle proof — proven the
                     way a price feed is proven. Nobody vouches for it. There is nobody to bribe.

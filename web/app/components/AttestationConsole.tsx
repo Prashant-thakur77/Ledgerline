@@ -6,7 +6,7 @@ import type { LogLine, Phase } from "@/lib/useAttestation";
 /**
  * The live attestation log.
  *
- * An FDC attestation takes three to five minutes. Every project that uses FDC hides that behind a spinner;
+ * An FDC attestation takes a couple of minutes. Every project that uses FDC hides that behind a spinner;
  * hiding it is what makes an oracle look like a database call. Printing it — the round it landed in, how
  * many rounds have passed since, the Merkle root the moment it is relayed, each with a link a judge can
  * open while it is still happening — turns the latency into the argument. Nothing here is simulated.
