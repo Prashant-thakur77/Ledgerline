@@ -116,18 +116,22 @@ verifies the source on the explorer.
 One occurrence in each of 12 files:
 
 ```bash
-OLD=0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66
+OLD=<the address being replaced>
 NEW=<paste the new MANAGER_ADDRESS here>
 
 grep -rl "$OLD" --include=*.ts --include=*.tsx --include=*.md . \
-  | grep -v node_modules \
+  | grep -v node_modules | grep -v "handoff/BRIEF.md" | grep -v "verify-claims.ts" \
   | xargs sed -i "s/$OLD/$NEW/g"
 
-grep -rn "$OLD" --include=*.ts --include=*.tsx --include=*.md . | grep -v node_modules
-# ^ should print nothing
+grep -rln "$OLD" --include=*.ts --include=*.tsx --include=*.md . | grep -v node_modules
+# ^ should print only verify-claims.ts and handoff/BRIEF.md
 ```
 
-Leave `handoff/BRIEF.md` alone if you prefer — it is a historical document, not a live reference.
+Two files are excluded on purpose. `handoff/BRIEF.md` is a point-in-time document and rewriting it would
+misrepresent what was true when it was written. `scripts/ledgerline/verify-claims.ts` needs to keep **both**
+addresses, because transactions cited in the documentation were sent to whichever deployment was current at
+the time — add the new one to its `NAMED` map rather than replacing the old one, or the checker prints bare
+hex for perfectly good historical transactions and it reads like a failure.
 
 ### 3c. Re-check
 
@@ -339,7 +343,7 @@ newly built, and what was integrated or improved.
 | | |
 |---|---|
 | `RevenueOracle` | `0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6` |
-| `AdvanceManager` | `0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66` *(update if you redeployed)* |
+| `AdvanceManager` | `0x63fC5a5c422D40DcC8FA267384BA5351d8698A58` *(update if you redeployed)* |
 
 Both source-verified. Coston2, chain id 114.
 

@@ -1,5 +1,5 @@
 export const ORACLE_ADDRESS = "0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6" as const;
-export const MANAGER_ADDRESS = "0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66" as const;
+export const MANAGER_ADDRESS = "0x63fC5a5c422D40DcC8FA267384BA5351d8698A58" as const;
 export const FXRP_ADDRESS = "0x0b6A3645c240605887a5532109323A3E12273dc7" as const;
 
 export const EXPLORER = "https://coston2-explorer.flare.network";

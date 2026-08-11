@@ -17,9 +17,17 @@ import path from "path";
 const ROOT = path.join(__dirname, "..", "..");
 const FILES = ["README.md", "docs/DEPLOYED.md", "docs/DEMO.md", "docs/PHASE0.md", "docs/BLOCKERS.md", "handoff/BRIEF.md"];
 
+/*
+ * Superseded addresses are kept here on purpose. Transactions cited in the documentation were sent to the
+ * deployment that was current at the time, and a checker that only knew the latest address would print a
+ * bare hex string for them — which reads like something is wrong when nothing is.
+ */
 const NAMED: Record<string, string> = {
     "0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6": "RevenueOracle",
-    "0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66": "AdvanceManager",
+    "0x63fC5a5c422D40DcC8FA267384BA5351d8698A58": "AdvanceManager",
+    "0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66": "AdvanceManager (superseded)",
+    "0x5774E51335277893c5f177bb6735b4CF2fE76A63": "AdvanceManager (superseded)",
+    "0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8": "RevenueOracle (superseded)",
     "0x0b6A3645c240605887a5532109323A3E12273dc7": "FXRP (FTestXRP)",
     "0x48aC463d7975828989331F4De43341627b9c5f1D": "FdcHub",
 };

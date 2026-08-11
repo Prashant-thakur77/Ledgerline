@@ -98,6 +98,36 @@ holds two periods, both attested from live Stripe API calls:
 Both windows cover the same three Stripe charges, so they prove the same figure — the second is a fresh
 attestation, not a second month of trading. That run was timed end to end at **122 seconds**.
 
+### The loop closes: funded in real XRP, repaid in real XRP
+
+Run against the current [`AdvanceManager`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code).
+Money leaves Flare for the XRP Ledger through FAssets, and comes back through a second FDC attestation type.
+**No FXRP, and no EVM asset, is held by the borrower at any point in either direction.**
+
+| | |
+|---|---|
+| **Out** — advance redeemed through FAssets, 1 lot | [`0x63f50a21…`](https://coston2-explorer.flare.network/tx/0x63f50a21ec6dc5638ec28ffa63f15413e8c6d580e1f52037a76d5b92144dfa92) |
+| An agent paid the borrower's XRPL account | **+9.95 XRP** (10 less the redemption fee), balance 89.999976 → 99.949976 |
+| Debt recorded on Flare | **$10.53** — $10.03 principal at $1.004296, plus the 5% fee |
+| **Back** — a plain XRP payment, 5 XRP, one 32-byte memo | [`10E4F29B…`](https://testnet.xrpl.org/transactions/10E4F29BC5608E5438964ECB3147D34600869D389186C612505678CEE4E70AD5) |
+| FDC **Payment** attestation | round **1,422,483**, proof of 3 Merkle siblings |
+| `repayFromXrpl` verified it and settled the debt | [`0x99d0f4b2…`](https://coston2-explorer.flare.network/tx/0x99d0f4b26d70bc47fda3be9954741597ab7df17afe2d2d7798d2cbae198a6144) |
+| Owed | **$10.53 → $5.51** |
+
+The contract did not take the payment on trust. It checked that the attestation was for the XRP Ledger
+testnet and not another chain, that the payment succeeded, that it was paid to *this* contract's XRPL
+account, that its payment reference was *this* account id, that the transaction had not already been
+counted — and only then, last because it is the expensive step, that the Merkle proof verifies against
+Flare's own verification contract.
+
+The reference is what makes an otherwise anonymous XRP payment settle one specific debt, and on the XRP
+Ledger it has to be a single memo of exactly 32 bytes. The memo on that payment reads
+`C60C21E2…6D77`, which is the account id for `stripe/acct_1U2HbaRh1zuX9OfD`.
+
+`treasuryBalance` deliberately did not move: the XRP is on the XRP Ledger, not on Flare, and crediting the
+Flare treasury would put a number in storage that no balance backs. Returning that value means minting FXRP
+from the received XRP through FAssets, which is the production answer and is not built here.
+
 ### Checking these claims
 
 Every transaction linked in this README and in `docs/` can be checked against the chain in one command:
@@ -115,7 +145,8 @@ document that claims more than the chain can support.
 | Contract | Address |
 |---|---|
 | `RevenueOracle` | [`0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code) |
-| `AdvanceManager` | [`0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66`](https://coston2-explorer.flare.network/address/0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66#code) |
+| `AdvanceManager` | [`0x63fC5a5c422D40DcC8FA267384BA5351d8698A58`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code) |
+| XRPL treasury (repayments arrive here) | [`r9aTnFEPnSceeGjDgcbhqsK3epizmZGC2o`](https://testnet.xrpl.org/accounts/r9aTnFEPnSceeGjDgcbhqsK3epizmZGC2o) |
 | FAssets `AssetManager` (FXRP) | [`0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`](https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA) |
 | FXRP (`FTestXRP`) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |
 
@@ -404,32 +435,13 @@ key and a guard that refuses an `sk_` key outright, but it deserves a warning at
 
 ## Roadmap
 
-1. **Repayment from the XRP Ledger — written and tested, not yet deployed.** `repayFromXrpl` takes an FDC
-   **Payment** proof of a plain XRP transfer into the treasury account carrying the account id as its payment
-   reference, prices it through FTSOv2 and reduces the dollar obligation. That is a second FDC attestation
-   type alongside Web2Json, and the last step needed for a borrower who never touches an EVM wallet in either
-   direction. It has 19 tests covering the conversion, overpayment, replay, wrong chain, wrong recipient,
-   wrong reference and an unverified proof.
-
-   **The attestation half is proven on real infrastructure**, even though the contract is not yet deployed.
-   A genuine XRPL testnet payment was sent, attested by FDC, and the decoded response checked field by field
-   against what `repayFromXrpl` requires:
-
-   | | |
-   |---|---|
-   | XRPL payment, 5 XRP, memo carrying the account id | [`F229BC43…`](https://testnet.xrpl.org/transactions/F229BC43D7596E6239AD72BE0E354F09770F57BB01BF223C96D21BBF8E6D45C2) |
-   | FDC voting round | 1,422,353, proof of 3 Merkle siblings |
-   | `standardPaymentReference` | `0xc60c21e2…6d77` — equal to the account id |
-   | `receivingAddressHash` | matches `keccak256` of the treasury address |
-   | `status` | 0, success |
-
-   Every field the contract checks is correct, so the proof would be accepted.
-
-   **What is not done is the deployment.** The `AdvanceManager` address below predates this function, and
-   putting it on chain means a new address and a re-funded treasury — queued behind a faucet claim rather
-   than rushed before a deadline. The honest status: the mechanism is verified against the real network, the
-   contract logic has 19 tests, and the two have not yet been introduced to each other. Nothing else in this
-   README depends on it.
+1. **Repayment in smaller amounts, and from any XRPL account.** The return leg is built, deployed and run on
+   chain — see *The loop closes* above. Two limits remain. A repayment currently has to come from an account
+   whose payment is attested individually, which costs an FDC request per repayment; batching several
+   payments into one attestation round would make small, frequent repayments economic. And the contract
+   accepts a payment from *any* XRPL sender as long as the reference matches, which is deliberate — it lets
+   a third party settle someone's debt — but a borrower who wants to bind repayment to their own XRPL
+   account has no way to say so yet.
 2. **Flare Smart Accounts, so the borrower needs no EVM wallet at all.** This is the natural next step, and
    it is Flare's own newest work rather than something we would have to invent.
 

@@ -6,7 +6,7 @@ the explorer.
 | Contract | Address |
 |---|---|
 | `RevenueOracle` | [`0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code) |
-| `AdvanceManager` (v2, with the XRPL leg) | [`0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66`](https://coston2-explorer.flare.network/address/0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66#code) |
+| `AdvanceManager` (v2, with the XRPL leg) | [`0x63fC5a5c422D40DcC8FA267384BA5351d8698A58`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code) |
 | `AdvanceManager` (v1, superseded) | [`0x5774E51335277893c5f177bb6735b4CF2fE76A63`](https://coston2-explorer.flare.network/address/0x5774E51335277893c5f177bb6735b4CF2fE76A63#code) |
 | FAssets `AssetManager` (FXRP) | [`0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`](https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA) |
 | FXRP (`FTestXRP`, 6 decimals) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |
