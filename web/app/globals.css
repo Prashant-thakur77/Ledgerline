@@ -682,3 +682,261 @@ input::placeholder {
         content: "";
     }
 }
+
+/* ---------------------------------------------------------------- site chrome */
+
+/*
+ * The landing page and the application are different rooms. The landing has to explain itself to someone
+ * who arrived cold and has not connected anything; the app assumes they already decided. Splitting them is
+ * what lets the first screen be an argument rather than a wallet prompt.
+ */
+
+.siteheader,
+.appheader {
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.siteheader-in,
+.appheader-in {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 14px var(--gutter);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.brand {
+    font-weight: 650;
+    font-size: 16px;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+}
+
+.siteheader nav {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    font-size: 14px;
+}
+
+/* The explanatory links are a desktop nicety; the action stays at every width. */
+.siteheader nav a:not(.btn-link) {
+    display: none;
+    color: var(--pending);
+    text-decoration: none;
+}
+
+.siteheader nav a:not(.btn-link):hover {
+    color: var(--ink);
+}
+
+@media (min-width: 641px) {
+    .siteheader nav a:not(.btn-link) {
+        display: inline;
+    }
+}
+
+.btn-link {
+    text-decoration: none;
+    font-weight: 550;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 1px;
+}
+
+.appheader-right {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.sitefooter {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+}
+
+.sitefooter p {
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- landing */
+
+.landing section {
+    margin-bottom: clamp(48px, 9vw, 76px);
+}
+
+.hero {
+    padding-top: clamp(24px, 6vw, 44px);
+}
+
+.eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pending);
+    margin-bottom: 18px;
+}
+
+.landing h1 {
+    font-size: clamp(30px, 8vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    max-width: 17ch;
+}
+
+/* Buttons that are links need the same shape as real buttons. */
+.cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 12px 22px;
+    border-radius: 2px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 15px;
+    font-weight: 550;
+    letter-spacing: -0.005em;
+    text-decoration: none;
+    transition: opacity 120ms ease-out;
+}
+
+.btn:hover {
+    opacity: 0.86;
+}
+
+.btn.ghost-btn {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--rule);
+    font-weight: 450;
+}
+
+@media (max-width: 520px) {
+    .cta {
+        flex-direction: column;
+    }
+    .btn {
+        width: 100%;
+    }
+}
+
+/*
+ * The one live element on an otherwise static page. Sunk into the paper so it reads as something being
+ * displayed rather than something being asserted.
+ */
+.proofcard {
+    background: var(--paper-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: clamp(20px, 5vw, 28px);
+    margin-top: 18px;
+}
+
+.proofcard .figure {
+    margin-top: 10px;
+}
+
+.cards {
+    display: grid;
+    gap: 18px;
+    margin-top: 20px;
+}
+
+@media (min-width: 721px) {
+    .cards {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px;
+    }
+}
+
+.card {
+    border-top: 2px solid var(--ink);
+    padding-top: 14px;
+}
+
+.card h3 {
+    font-size: 15px;
+    margin-bottom: 8px;
+    max-width: 24ch;
+}
+
+.card p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--pending);
+    margin: 0;
+}
+
+h3.sub {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    margin: 30px 0 0;
+}
+
+.evidence {
+    list-style: none;
+    margin: 10px 0 22px;
+    padding: 0;
+}
+
+.evidence li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 14px;
+}
+
+.evidence li:last-child {
+    border-bottom: 0;
+}
+
+.evidence li > span:first-child {
+    color: var(--pending);
+}
+
+.evidence a {
+    color: var(--proof);
+    text-decoration: none;
+}
+
+.evidence a:hover {
+    text-decoration: underline;
+}
+
+@media (min-width: 561px) {
+    .evidence li {
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 20px;
+    }
+}
+
+.finalcta {
+    border-top: 1px solid var(--rule);
+    padding-top: clamp(32px, 7vw, 48px);
+}
+
+code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+}
