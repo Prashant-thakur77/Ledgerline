@@ -6,7 +6,6 @@ import {
     useChainId,
     useConnect,
     useDisconnect,
-    usePublicClient,
     useReadContract,
     useSimulateContract,
     useSwitchChain,
@@ -36,7 +35,6 @@ export default function Page() {
     const { disconnect } = useDisconnect();
     const { switchChain } = useSwitchChain();
     const chainId = useChainId();
-    const client = usePublicClient();
 
     // Which account the page is looking at. The Stripe account is ours and is bound to the wallet that first
     // proved it; the sandbox one belongs to whoever is connected, so a visitor can run the whole loop.
@@ -118,40 +116,27 @@ export default function Page() {
 
     const periods = history ?? [];
 
-    // Map each proven period to the transaction that proved it, so the proof line opens the real thing.
+    /*
+     * Map each proven period to the transaction that proved it, so the proof line opens the real thing.
+     *
+     * Asked of the explorer's log index rather than the node: Coston2's public RPC refuses an `eth_getLogs`
+     * spanning more than 30 blocks, so scanning back to the deployment is not possible from the browser.
+     */
     useEffect(() => {
-        if (!client || !accountId || periods.length === 0) return;
+        if (!accountId || periods.length === 0) return;
+        let cancelled = false;
         void (async () => {
             try {
-                const logs = await client.getLogs({
-                    address: ORACLE_ADDRESS,
-                    event: {
-                        type: "event",
-                        name: "RevenueProven",
-                        inputs: [
-                            { name: "accountId", type: "bytes32", indexed: true },
-                            { name: "owner", type: "address", indexed: true },
-                            { name: "revenueCents", type: "uint256" },
-                            { name: "periodStart", type: "uint64" },
-                            { name: "periodEnd", type: "uint64" },
-                            { name: "votingRound", type: "uint64" },
-                            { name: "merkleRoot", type: "bytes32" },
-                        ],
-                    },
-                    args: { accountId },
-                    fromBlock: "earliest",
-                });
-                const next: Record<string, string> = {};
-                for (const l of logs) {
-                    const end = (l as any).args?.periodEnd;
-                    if (end !== undefined) next[String(end)] = l.transactionHash!;
-                }
-                setTxByPeriod(next);
+                const found = await fetch(`/api/proofs?accountId=${accountId}`).then((r) => r.json());
+                if (!cancelled && found && !found.error) setTxByPeriod(found);
             } catch {
-                /* logs are a nicety; the proof line still shows round and root without them */
+                /* the link is a nicety; the proof line still shows the round and the root without it */
             }
         })();
-    }, [client, accountId, periods.length]);
+        return () => {
+            cancelled = true;
+        };
+    }, [accountId, periods.length]);
 
     // The one motion moment: a period that appears while the page is open resolves in.
     useEffect(() => {

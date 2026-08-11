@@ -7,6 +7,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { ContractRegistry } from "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
+import { IPayment } from "@flarenetwork/flare-periphery-contracts/coston2/IPayment.sol";
 import { RevenueOracle } from "./RevenueOracle.sol";
 
 /// @dev The slice of FAssets' AssetManager this contract needs: burn FXRP and have an agent pay XRP out.
@@ -72,6 +73,22 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
     /// @notice FAssets AssetManager for FXRP. Optional: unset simply means the XRPL leg is unavailable.
     IFAssetRedeemer public assetManager;
+
+    /**
+     * @notice The chain an XRPL repayment must have happened on, as an FDC source id.
+     * `bytes32("testXRP")` on Coston2, `bytes32("XRP")` in production. Pinning it stops a payment on one
+     * chain being replayed as proof of a payment on another.
+     */
+    bytes32 public xrplSourceId;
+
+    /// @notice The XRPL account borrowers repay to. Held as a hash because that is what FDC attests.
+    bytes32 public xrplTreasuryAddressHash;
+
+    /// @notice Kept alongside the hash purely so the interface can display something a borrower can pay.
+    string public xrplTreasuryAddress;
+
+    /// @notice XRPL transaction ids already consumed, so one payment can never be claimed twice.
+    mapping(bytes32 => bool) public xrplPaymentUsed;
 
     mapping(bytes32 => Advance) private _advances;
 

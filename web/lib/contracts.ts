@@ -4,6 +4,13 @@ export const FXRP_ADDRESS = "0x0b6A3645c240605887a5532109323A3E12273dc7" as cons
 
 export const EXPLORER = "https://coston2-explorer.flare.network";
 
+/**
+ * The block `RevenueOracle` was created in. Log queries start here rather than at genesis: a public RPC
+ * will refuse, or take a very long time over, a range covering the whole chain, and nothing this app cares
+ * about happened before its own deployment.
+ */
+export const DEPLOY_BLOCK = 33_798_869n;
+
 export const oracleAbi = [
     {
         type: "function",

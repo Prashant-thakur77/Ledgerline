@@ -51,6 +51,28 @@ the one to choose it.
 
 ---
 
+## 3. Coston2's public RPC caps `eth_getLogs` at 30 blocks — RESOLVED 2026-08-11
+
+The proof line under each figure is meant to open the transaction that verified it, which means finding the
+`RevenueProven` event for that period. The obvious implementation — `getLogs` from the deployment block —
+cannot work:
+
+```
+{"code":-32000,"message":"requested too many blocks from 33812181 to 33914095, maximum is set to 30"}
+```
+
+Thirty blocks is about a minute of chain. Any range wide enough to be useful is refused, so the link was
+silently missing on every figure older than a minute. It failed quietly because the code treated a log query
+failure as cosmetic, which is exactly how a broken feature survives review.
+
+Resolved by asking the explorer's log index instead of the node, in
+[`web/app/api/proofs/route.ts`](../web/app/api/proofs/route.ts). Blockscout answers the same query over an
+unbounded range in one request. The route filters by `topic0` (the `RevenueProven` signature) and `topic1`
+(the account id), decodes `periodEnd` out of the event data, and returns a period → transaction map.
+
+Worth knowing for anyone building on Coston2: **do not assume a log scan works from the browser.** Either use
+the explorer API, run an archive node, or store what you need on chain.
+
 ## Not blockers, but corrections to the brief worth knowing
 
 - **The verifier needs no API key.** The brief says the all-zeros placeholder returns 401 and a real key must be

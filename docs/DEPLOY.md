@@ -1,88 +1,78 @@
-# Putting the interface somewhere a judge can reach it
+# Putting the interface on the public internet
 
-The app is a standard Next.js 16 project in `web/`. It has no database, no background jobs and no long-running
-requests, so it deploys as-is to any host that runs Next.js.
+The app is a self-contained Next.js project in [`web/`](../web). It talks to Coston2 over a public RPC and to
+two Flare services through short server-side proxies, so there is nothing to host besides the app itself — no
+database, no indexer, no background worker.
 
-## Why there is nothing exotic here
+## Why it deploys anywhere
 
-The obvious way to stream a live FDC attestation into a browser is to have the server run the attestation and
-push progress down — spawn the Hardhat script, parse its stdout, send Server-Sent Events. That works locally
-and breaks on almost every host, because the attestation takes about two minutes and serverless functions are
-killed long before that.
+The slow part of this product is an FDC attestation, which takes about two minutes. That wait happens in the
+**browser**, not on the server: [`web/lib/useAttestation.ts`](../web/lib/useAttestation.ts) drives the loop and
+polls, and the two server routes it calls each do one short HTTP request and return.
 
-So the loop runs in the browser instead. `web/lib/useAttestation.ts` does the waiting, and the two server
-routes it calls are short proxies:
-
-| Route | Why it exists | Duration |
+| Route | What it does | Typical duration |
 |---|---|---|
-| `POST /api/attest/prepare` | The FDC verifier is not CORS-open, and the Stripe key must not ship in the JavaScript bundle | one request |
-| `POST /api/attest/proof` | The Data Availability layer is not CORS-open. Returns `{pending:true}` immediately rather than sleeping | one request |
+| [`/api/attest/prepare`](../web/app/api/attest/prepare/route.ts) | Asks the FDC verifier to encode the request | under a second |
+| [`/api/attest/proof`](../web/app/api/attest/proof/route.ts) | Asks the DA layer for the proof, or reports "not yet" | under a second |
 
-Neither ever waits for a voting round. There is no function that can time out, and the page behaves the same
-locally and deployed.
+Neither ever sleeps or waits for a round. That means no serverless function timeout can kill an attestation
+half way through, and the deployed site behaves exactly like the local one. `vercel.json` sets a 30-second
+ceiling on those routes, which is roughly thirty times more than they need.
 
-## Vercel
+## Deploying to Vercel
 
-This repository has no git remote on purpose, so deploy from the CLI rather than by connecting a repo.
+The repository root is a Hardhat project, so **the Vercel project's root directory must be set to `web`**.
+Otherwise the build will try to build the contracts.
 
 ```bash
 cd web
-npx vercel            # first run links the project; accept the defaults
+npx vercel            # first run links the project — set root directory to "web" when asked
 npx vercel --prod
 ```
 
-Vercel detects Next.js automatically. Because the Next app is in `web/` rather than at the repository root,
-run the command from inside `web/` — that makes `web/` the project root and no `rootDirectory` setting is
-needed.
+Or from the dashboard: *New Project* → import the repository → set **Root Directory** to `web` → framework
+preset *Next.js* (detected automatically).
 
 ### Environment variables
 
-Set these in the Vercel dashboard (Project → Settings → Environment Variables), or with
-`npx vercel env add <NAME> production`. Only the first is a secret.
+Set these in *Project Settings → Environment Variables*. Only the first is a secret.
 
-| Variable | Value | Notes |
+| Variable | Value | Needed for |
 |---|---|---|
-| `STRIPE_API_KEY` | `rk_test_…` | **Secret.** Read-only restricted key. Omit it and the app offers only the sandbox source, which still exercises the whole pipeline. |
-| `LEDGERLINE_ACCOUNT_REF` | `acct_1U2HbaRh1zuX9OfD` | The one Stripe account this deployment may attest. Pinned server-side so a visitor cannot attest our revenue under a reference of their own choosing. |
-| `VERIFIER_URL_TESTNET` | `https://fdc-verifiers-testnet.flare.network` | Public. |
-| `VERIFIER_API_KEY_TESTNET` | `00000000-0000-0000-0000-000000000000` | Public — the documented testnet key. Not a secret. |
-| `COSTON2_DA_LAYER_URL` | `https://ctn2-data-availability.flare.network` | Public. |
-| `NEXT_PUBLIC_ACCOUNT_REF` | `acct_1U2HbaRh1zuX9OfD` | Shown in the interface. Safe to expose; it is already on chain. |
+| `STRIPE_API_KEY` | `rk_test_…` — the **read-only restricted** key | The live Stripe source. Without it the app still runs and offers the sandbox source. |
+| `LEDGERLINE_ACCOUNT_REF` | `acct_1U2HbaRh1zuX9OfD` | Pins which Stripe account this deployment may attest |
+| `NEXT_PUBLIC_ACCOUNT_REF` | `acct_1U2HbaRh1zuX9OfD` | The account the page displays |
+| `VERIFIER_URL_TESTNET` | `https://fdc-verifiers-testnet.flare.network` | Defaulted in code; set it to be explicit |
+| `VERIFIER_API_KEY_TESTNET` | `00000000-0000-0000-0000-000000000000` | The documented public testnet key — not a secret |
+| `COSTON2_DA_LAYER_URL` | `https://ctn2-data-availability.flare.network` | Defaulted in code; set it to be explicit |
 
-The contract addresses are compiled in at `web/lib/contracts.ts` and need no configuration.
+**Never set `PRIVATE_KEY` here.** The deployed app never signs anything. Every transaction is signed by the
+visitor's own wallet, which is also why a visitor can prove a period against an account bound to themselves.
 
-**Never set `PRIVATE_KEY` on the host.** The deployment signs nothing. Every transaction is signed by the
-visitor's own wallet, which is also why a stranger can run a real attestation without anything from us.
+`STRIPE_API_KEY` must be the restricted `rk_test_…` key. Both source builders refuse an `sk_` key outright,
+because an FDC attestation request is public calldata and the key in it is permanently world-readable — see
+[BLOCKERS.md](BLOCKERS.md).
 
-## Checking a deployment actually works
+## What a visitor can do without any setup
 
-```bash
-# the verifier proxy — should return an abiEncodedRequest
-curl -sS -X POST https://<your-deployment>/api/attest/prepare \
-  -H 'Content-Type: application/json' \
-  -d '{"source":"demo","accountRef":"0x0000000000000000000000000000000000000001",
-       "revenueCents":400000,"periodStart":1780000000,"periodEnd":1782592000}' | head -c 200
+- Read every proven period, with the FDC round and Merkle root behind each figure, and open the transaction
+  that verified it.
+- Watch a live attestation run, with links to Flare's systems explorer for the voting round while it is still
+  open.
+- Connect a wallet, run a **real** attestation against an account bound to their own address using the keyless
+  sandbox source, and see the resulting record appear.
 
-# the DA layer proxy — should return {"pending":true,...} rather than an error
-curl -sS -X POST https://<your-deployment>/api/attest/proof \
-  -H 'Content-Type: application/json' \
-  -d '{"votingRoundId":1422334,"requestBytes":"0xdeadbeef"}'
-```
+Taking an advance additionally needs the treasury to hold FXRP. When it does not, the interface says so
+plainly rather than offering a button that reverts.
 
-Then open the page, connect a wallet on Coston2, pick **Yours**, and run an attestation. It should finish in
-about two minutes and end with a transaction hash. If the console stalls at "waiting for the round to be
-relayed" for more than five minutes, the round genuinely has not been relayed — check
-`https://coston2-systems-explorer.flare.network/voting-round/<round>?tab=fdc`.
-
-## Before demonstrating anything
-
-The treasury has to hold FXRP or no advance can be issued. Claim from
-[the Coston2 faucet](https://faucet.flare.network/coston2) — 100 C2FLR and 10 FXRP per address per 24 hours —
-to `0x5c051991900E6202430d28B26c9D21C7C23ef290`, then fund the treasury and check with:
+## Checking a deployment
 
 ```bash
-npx hardhat run scripts/ledgerline/state.ts --network coston2
+curl -s https://<your-deployment>/api/attest/proof \
+  -H 'Content-Type: application/json' \
+  -d '{"votingRoundId":1422337,"requestBytes":"0xdeadbeef"}'
+# {"pending":true,...}  — the proxy is reachable and correctly reports "not yet"
 ```
 
-The interface reads `treasuryBalance` and says plainly when it is empty rather than letting the button revert,
-but a demo where the last step cannot run is still a demo where the last step cannot run.
+Then run `npx hardhat run scripts/ledgerline/state.ts --network coston2` from the repository root and confirm
+the figures on the page match what the contracts return.
