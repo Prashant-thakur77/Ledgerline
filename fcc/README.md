@@ -33,7 +33,7 @@ scaffold's greeting — has been executed by it end to end.
 
 | | |
 |---|---|
-| Extension ID | **66180** (`0x10284`) |
+| Extension ID | **66180** (`0x10284`) — first registration; the key-in-enclave op below runs on **66184** |
 | InstructionSender | [`0xd7DADF66AF4dA4C5FF0Ccdcccc77db1a46520341`](https://coston2-explorer.flare.network/address/0xd7DADF66AF4dA4C5FF0Ccdcccc77db1a46520341) |
 | TEE machine | `0x0f42321d590876FC4aEC0DfaA13c5993e8B22103` — status **2 (PRODUCTION)**, sole active machine for 66180 |
 | Attested code hash | `0x194844cf417dde867073e5ab7199fa4d21fd82b5dbe2bdea8b3d7fc18d10fdc2` (platform `TEST_PLATFORM`) |
@@ -80,7 +80,9 @@ cd fcc/typescript && npx vitest run                  # 66 tests
 npx hardhat test test/PrivateUnderwriter.test.ts     # from the repo root
 ```
 
-Against the live platform (needs the services up, a public proxy tunnel, and a funded key in `fcc/.env`):
+Against the live platform (needs the services up, a public proxy tunnel, and a funded key in `fcc/.env`).
+Note the on-chain evidence above stands whether or not the services are currently running; the tunnel and
+containers only need to be up to send *new* instructions:
 
 ```bash
 cd fcc
