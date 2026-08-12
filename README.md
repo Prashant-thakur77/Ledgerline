@@ -28,7 +28,7 @@ these six places:**
 | Path | What it is |
 |---|---|
 | [`contracts/ledgerline/`](contracts/ledgerline/) | Four contracts — oracle, manager, lender pool, private underwriter — all source-verified on chain. |
-| [`test/`](test/) | 129 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 200-step invariant walk. |
+| [`test/`](test/) | 144 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 200-step invariant walk. |
 | [`scripts/ledgerline/`](scripts/ledgerline/) | Deploy, attest, borrow, repay, redeem to XRPL, and a one-screen state dump. |
 | [`web/app/`](web/app/) | The interface, including the live attestation console and its two API routes. |
 | [`web/lib/`](web/lib/) | The Flare protocol layer the browser drives an attestation with. |
@@ -203,22 +203,37 @@ measurement is reported by the proxy rather than attested by confidential hardwa
 
 ## Deployed on Coston2 (chain id 114)
 
-**V2 — current.** Adds the attack-resistant underwriting (tier schedule below card fees, non-overlapping
-periods, attested account age), the ERC-4626 lender pool, pause-on-originations, write-offs, batched XRPL
-repayment, sender binding and overpayment credit. The first period is already proven on it from a live
-Stripe call: [`0xcada3fee…`](https://coston2-explorer.flare.network/tx/0xcada3fee00b508a3abfa01cd51b73da1c0f66aea7b41863563c10c263d18ea41).
+**V4 — current.** The audited generation. An adversarial testing pass over every money path found and fixed
+five defects the previous deployment carried: credit could retire pool principal before it was lent (a
+share-price inflation), XRP arriving with no open advance was never booked as the pool's claim, the XRP/USD
+feed's age was never checked, a one-cent repayment inside each grace period could hold a balance open
+forever (advances now carry a 180-day term), and a short FAssets fill was booked as if it had been full
+(it now reverts). A proven period must also actually be a month (26–32 days) — the underwriting prices it
+as one, so a single honest attestation covering a year would otherwise borrow an order of magnitude past
+the policy.
+
+Already exercised live: revenue proven from a real Stripe call
+([`0x7c380dc6…`](https://coston2-explorer.flare.network/tx/0x7c380dc6c1b46e6de1f8b1ea406a52af3cd36a2ea92ffd49997f1267ce6ea350)),
+a pool-funded advance
+([`0x33ee81d3…`](https://coston2-explorer.flare.network/tx/0x33ee81d3a0daea56d5ee45a0ff33afdcc1c4b9f30b8447f08744f4f1678d714f))
+and its full repayment closing the books exactly
+([`0x98344c79…`](https://coston2-explorer.flare.network/tx/0x98344c791fd565bedeb707439b75712f5d4aa640acf0cfac66d3dc1c6d9603d0)
+— `lentFxrp` back to zero, one clean cycle earned, the fee in the share price).
 
 | Contract | Address |
 |---|---|
-| `RevenueOracle` | [`0x151FDDB3d60B1Cc9AD43e0831495D430b0412906`](https://coston2-explorer.flare.network/address/0x151FDDB3d60B1Cc9AD43e0831495D430b0412906#code) |
-| `AdvanceManager` | [`0xae027AeB3d1FBa24743D1ADE902521641F32f41c`](https://coston2-explorer.flare.network/address/0xae027AeB3d1FBa24743D1ADE902521641F32f41c#code) |
-| `LenderPool` (ERC-4626) | [`0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7`](https://coston2-explorer.flare.network/address/0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7#code) |
+| `RevenueOracle` | [`0x639ca7C10DC1619d7cAA2B5a286372345194864b`](https://coston2-explorer.flare.network/address/0x639ca7C10DC1619d7cAA2B5a286372345194864b#code) |
+| `AdvanceManager` | [`0x24f2c925679e737174103A5F6715b766E3D5D602`](https://coston2-explorer.flare.network/address/0x24f2c925679e737174103A5F6715b766E3D5D602#code) |
+| `LenderPool` (ERC-4626) | [`0x38560eE630071846158F639a217E6a0fB2d66Fe2`](https://coston2-explorer.flare.network/address/0x38560eE630071846158F639a217E6a0fB2d66Fe2#code) |
 | `PrivateUnderwriter` (Confidential Compute) | [`0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a`](https://coston2-explorer.flare.network/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code) |
 
-Superseded generations, kept because the evidence above ran on them:
+Superseded generations, kept because evidence cited in this document ran on them:
 
 | Contract | Address |
 |---|---|
+| `RevenueOracle` (v3) | [`0x151FDDB3d60B1Cc9AD43e0831495D430b0412906`](https://coston2-explorer.flare.network/address/0x151FDDB3d60B1Cc9AD43e0831495D430b0412906#code) |
+| `AdvanceManager` (v3) | [`0xae027AeB3d1FBa24743D1ADE902521641F32f41c`](https://coston2-explorer.flare.network/address/0xae027AeB3d1FBa24743D1ADE902521641F32f41c#code) |
+| `LenderPool` (v3) | [`0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7`](https://coston2-explorer.flare.network/address/0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7#code) |
 | `RevenueOracle` (v1) | [`0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code) |
 | `AdvanceManager` (v1) | [`0x63fC5a5c422D40DcC8FA267384BA5351d8698A58`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code) |
 | XRPL treasury (repayments arrive here) | [`r9aTnFEPnSceeGjDgcbhqsK3epizmZGC2o`](https://testnet.xrpl.org/accounts/r9aTnFEPnSceeGjDgcbhqsK3epizmZGC2o) |
@@ -232,7 +247,7 @@ Both contracts are source-verified on the explorer. Full deployment notes in [do
 ```bash
 cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
 yarn install
-yarn hardhat test             # 129 tests
+yarn hardhat test             # 144 tests
 
 # fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
 yarn hardhat run scripts/ledgerline/deploy.ts --network coston2

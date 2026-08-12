@@ -1,6 +1,6 @@
-export const ORACLE_ADDRESS = "0x151FDDB3d60B1Cc9AD43e0831495D430b0412906" as const;
-export const MANAGER_ADDRESS = "0xae027AeB3d1FBa24743D1ADE902521641F32f41c" as const;
-export const POOL_ADDRESS = "0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7" as const;
+export const ORACLE_ADDRESS = "0x639ca7C10DC1619d7cAA2B5a286372345194864b" as const;
+export const MANAGER_ADDRESS = "0x24f2c925679e737174103A5F6715b766E3D5D602" as const;
+export const POOL_ADDRESS = "0x38560eE630071846158F639a217E6a0fB2d66Fe2" as const;
 export const FXRP_ADDRESS = "0x0b6A3645c240605887a5532109323A3E12273dc7" as const;
 
 export const EXPLORER = "https://coston2-explorer.flare.network";
@@ -10,7 +10,7 @@ export const EXPLORER = "https://coston2-explorer.flare.network";
  * will refuse, or take a very long time over, a range covering the whole chain, and nothing this app cares
  * about happened before its own deployment.
  */
-export const DEPLOY_BLOCK = 33977421n;
+export const DEPLOY_BLOCK = 33982400n;
 
 export const oracleAbi = [
     {
@@ -64,12 +64,11 @@ export const managerAbi = [
         name: "currentXrpUsd",
         stateMutability: "nonpayable",
         inputs: [],
-        // Two outputs, matching the deployed contract. `main` adds a third (the feed's publish time, for
-        // the staleness guard); this gains the third field in the same commit that deploys it, because an
-        // ABI that promises more than the deployed bytecode returns fails to decode at all.
         outputs: [
             { name: "price", type: "uint256" },
             { name: "decimals", type: "int8" },
+            // The feed's publish time — what the contract's own staleness guard measures against.
+            { name: "timestamp", type: "uint64" },
         ],
     },
     {

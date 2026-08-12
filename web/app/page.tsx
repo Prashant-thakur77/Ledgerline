@@ -126,7 +126,7 @@ export default function Landing() {
 
                         <Reveal delay={180}>
                             <div className="stats">
-                                <Stat value={136} label="automated tests, all passing" />
+                                <Stat value={144} label="automated tests, all passing" />
                                 <Stat value={2} label="FDC attestation types, both load-bearing" />
                                 <Stat value={116} suffix="s" label="measured, request to verified on chain" />
                                 <Stat value={0} label="keys this site holds" />
@@ -334,9 +334,9 @@ export default function Landing() {
                         </div>
                         <div className="foot-col">
                             <div className="foot-title">Contracts</div>
-                            <a href={`${EXPLORER}/address/0x151FDDB3d60B1Cc9AD43e0831495D430b0412906#code`} target="_blank" rel="noreferrer">RevenueOracle</a>
-                            <a href={`${EXPLORER}/address/0xae027AeB3d1FBa24743D1ADE902521641F32f41c#code`} target="_blank" rel="noreferrer">AdvanceManager</a>
-                            <a href={`${EXPLORER}/address/0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7#code`} target="_blank" rel="noreferrer">LenderPool</a>
+                            <a href={`${EXPLORER}/address/0x639ca7C10DC1619d7cAA2B5a286372345194864b#code`} target="_blank" rel="noreferrer">RevenueOracle</a>
+                            <a href={`${EXPLORER}/address/0x24f2c925679e737174103A5F6715b766E3D5D602#code`} target="_blank" rel="noreferrer">AdvanceManager</a>
+                            <a href={`${EXPLORER}/address/0x38560eE630071846158F639a217E6a0fB2d66Fe2#code`} target="_blank" rel="noreferrer">LenderPool</a>
                             <a href={`${EXPLORER}/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code`} target="_blank" rel="noreferrer">PrivateUnderwriter</a>
                         </div>
                         <div className="foot-col">
