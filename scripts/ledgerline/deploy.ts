@@ -61,6 +61,11 @@ async function main() {
     await (await manager.setPool(poolAddr)).wait();
     await (await manager.setAssetManager(ASSET_MANAGER)).wait();
 
+    // V3 economics: +8pts of factor per proven month, and a 4% risk premium at tier 0 melting to
+    // zero at the cap — expected loss priced, not hoped away.
+    await (await manager.setRiskTerms(800, 400)).wait();
+    console.log("Risk terms     : historyStep 800 bps, riskPremium 400 bps");
+
     const xrplTreasury = process.env.XRPL_TREASURY_ADDRESS;
     if (xrplTreasury) {
         await (await manager.setXrplTreasury(xrplTreasury, XRPL_SOURCE_ID)).wait();

@@ -119,6 +119,14 @@ export default function Page() {
         ...on,
     });
     const { data: feeBps } = useReadContract({ address: MANAGER_ADDRESS, abi: managerAbi, functionName: "feeBps" });
+    // The fee this account actually pays: base plus the risk premium its tier has not yet melted.
+    const { data: accountFee } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "accountFeeBps",
+        args: [accountId!],
+        ...on,
+    });
     const { data: shareBps } = useReadContract({
         address: MANAGER_ADDRESS,
         abi: managerAbi,
@@ -512,7 +520,8 @@ export default function Page() {
                             <span className="mono">
                                 {(() => {
                                     const base = leg === "fxrp" ? cents : (xrplCents ?? 0n);
-                                    const fee = feeBps ? (base * BigInt(feeBps)) / 10_000n : 0n;
+                                    const rate = accountFee ?? feeBps;
+                                    const fee = rate ? (base * BigInt(rate)) / 10_000n : 0n;
                                     return `${usd(base + fee)} in dollars`;
                                 })()}
                             </span>

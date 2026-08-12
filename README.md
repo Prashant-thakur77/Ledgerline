@@ -166,6 +166,24 @@ It resolves each hash, reports which contract it was sent to and whether it succ
 any claim is not backed by the chain. It is here because the fastest way to lose a reviewer's trust is a
 document that claims more than the chain can support.
 
+### Underwritten in private: the Confidential Compute path, on chain
+
+The [`fcc/`](fcc/) extension computed a decision from the demo account's real proven revenue, signed it
+with the enclave key, and [`PrivateUnderwriter`](https://coston2-explorer.flare.network/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code)
+verified the signature against the registered **code measurement** (the keccak256 of the built handler)
+before storing it:
+
+| | |
+|---|---|
+| Decision stored — **$97.91 limit, 2.5% factor, 8.9% risk-priced fee** | [`0x8b32907e…`](https://coston2-explorer.flare.network/tx/0x8b32907ea847421be70bacd8e5754752236cbbf673afd7dfbec6568832ff0de5) |
+| Revenue figure appearing anywhere in that transaction | **none** |
+| The public-path limit for the same account, same policy | **$97.91 — identical** |
+
+Two trust models, one answer: the FDC provider-quorum path and the enclave path price the account the same,
+which is what lets them coexist as a choice rather than a migration. Platform registration (which would move
+the signing key into attested hardware) is gated on Flare's VPN-access indexer and stated as such in
+[fcc/README.md](fcc/README.md).
+
 ## Deployed on Coston2 (chain id 114)
 
 **V2 — current.** Adds the attack-resistant underwriting (tier schedule below card fees, non-overlapping
@@ -175,9 +193,10 @@ Stripe call: [`0xcada3fee…`](https://coston2-explorer.flare.network/tx/0xcada3
 
 | Contract | Address |
 |---|---|
-| `RevenueOracle` | [`0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6`](https://coston2-explorer.flare.network/address/0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6#code) |
-| `AdvanceManager` | [`0xD397f88C6466C0F202b5387454d2897762FDE054`](https://coston2-explorer.flare.network/address/0xD397f88C6466C0F202b5387454d2897762FDE054#code) |
-| `LenderPool` (ERC-4626) | [`0x815337Dd052544b228b11A192Fe108F9482441f6`](https://coston2-explorer.flare.network/address/0x815337Dd052544b228b11A192Fe108F9482441f6#code) |
+| `RevenueOracle` | [`0x151FDDB3d60B1Cc9AD43e0831495D430b0412906`](https://coston2-explorer.flare.network/address/0x151FDDB3d60B1Cc9AD43e0831495D430b0412906#code) |
+| `AdvanceManager` | [`0xae027AeB3d1FBa24743D1ADE902521641F32f41c`](https://coston2-explorer.flare.network/address/0xae027AeB3d1FBa24743D1ADE902521641F32f41c#code) |
+| `LenderPool` (ERC-4626) | [`0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7`](https://coston2-explorer.flare.network/address/0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7#code) |
+| `PrivateUnderwriter` (Confidential Compute) | [`0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a`](https://coston2-explorer.flare.network/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code) |
 
 Superseded generations, kept because the evidence above ran on them:
 

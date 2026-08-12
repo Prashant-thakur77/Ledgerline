@@ -1,6 +1,6 @@
-export const ORACLE_ADDRESS = "0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6" as const;
-export const MANAGER_ADDRESS = "0xD397f88C6466C0F202b5387454d2897762FDE054" as const;
-export const POOL_ADDRESS = "0x815337Dd052544b228b11A192Fe108F9482441f6" as const;
+export const ORACLE_ADDRESS = "0x151FDDB3d60B1Cc9AD43e0831495D430b0412906" as const;
+export const MANAGER_ADDRESS = "0xae027AeB3d1FBa24743D1ADE902521641F32f41c" as const;
+export const POOL_ADDRESS = "0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7" as const;
 export const FXRP_ADDRESS = "0x0b6A3645c240605887a5532109323A3E12273dc7" as const;
 
 export const EXPLORER = "https://coston2-explorer.flare.network";
@@ -10,7 +10,7 @@ export const EXPLORER = "https://coston2-explorer.flare.network";
  * will refuse, or take a very long time over, a range covering the whole chain, and nothing this app cares
  * about happened before its own deployment.
  */
-export const DEPLOY_BLOCK = 33_973_977n;
+export const DEPLOY_BLOCK = 33977421n;
 
 export const oracleAbi = [
     {
@@ -165,6 +165,13 @@ export const managerAbi = [
         stateMutability: "view",
         inputs: [],
         outputs: [{ type: "string" }],
+    },
+    {
+        type: "function",
+        name: "accountFeeBps",
+        stateMutability: "view",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [{ type: "uint16" }],
     },
     {
         type: "function",

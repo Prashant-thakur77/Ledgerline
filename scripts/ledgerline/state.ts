@@ -10,8 +10,8 @@ import { ethers } from "hardhat";
  *   npx hardhat run scripts/ledgerline/state.ts --network coston2
  */
 
-const ORACLE = "0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6";
-const MANAGER = "0xD397f88C6466C0F202b5387454d2897762FDE054";
+const ORACLE = "0x151FDDB3d60B1Cc9AD43e0831495D430b0412906";
+const MANAGER = "0xae027AeB3d1FBa24743D1ADE902521641F32f41c";
 const FXRP = "0x0b6A3645c240605887a5532109323A3E12273dc7";
 const PLATFORM = "stripe";
 const ACCOUNT_REF = process.env.STRIPE_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
