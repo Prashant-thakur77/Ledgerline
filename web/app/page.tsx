@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 const EXPLORER = "https://coston2-explorer.flare.network";
 const XRPL = "https://testnet.xrpl.org";
-const REPO = "https://github.com/Prashant-thakur77/Proofline";
+const REPO = "https://github.com/Prashant-thakur77/Ledgerline";
 
 /**
  * The landing page.
