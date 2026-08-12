@@ -56,7 +56,11 @@ underwriting runs inside an attested enclave, only `(accountId, limit, tier)` em
 the code hash instead of the revenue. Dual-mode: the public-quorum path stays for anyone who prefers
 provider consensus over attested hardware.
 
-**Status:** DESIGNED. Deliberately unbuilt while the FCC stack is unstable. 💰 enclave hosting
+**Status:** partially **BUILT** — see [`fcc/`](../fcc/): the underwriting extension is implemented on
+Flare's own scaffold (wire-conformant, 16/16 golden fixtures, 60 unit tests, no revenue in its output by
+test), and `PrivateUnderwriter.sol` verifies enclave-signed decisions against a registered code measurement
+(7 tests). What remains is platform registration, which is gated on Flare's VPN-access indexer — access,
+not code. The enclave path stays out of the live product until that registration exists. 💰 enclave hosting
 (~$100–500/mo on confidential VMs) when built.
 **Resolved when:** an account is underwritten with no revenue figure anywhere on chain, and an outside
 auditor reproduces the enclave image to the registered hash.
