@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Grain, Mark } from "../components/Chrome";
+import { PrivateDecision } from "../components/PrivateDecision";
 
 export const metadata: Metadata = {
     title: "Confidential · Proofline",
@@ -96,8 +97,22 @@ export default function Confidential() {
                                 <span>Came out</span>
                                 <span className="mono">limit $97.91 · factor 2.5% · fee 8.9%</span>
                             </div>
+                            <div className="row">
+                                <span>And with the key in the enclave</span>
+                                <a
+                                    className="mono"
+                                    href={`${EXPLORER}/tx/0x8a9e95937a1843ec76164b5db1fc1633ea274c0bb45137a1635c37d18ed68e88`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    0x8a9e9593… ↗
+                                </a>
+                            </div>
                             <p className="quiet" style={{ marginTop: 14, marginBottom: 0 }}>
-                                The revenue figure appears nowhere in the response. That is the entire point.
+                                The revenue figure appears nowhere in the response. In the second run the
+                                enclave read the processor itself: the calldata verifiably contains no API
+                                key and no figure, just an account reference and a month window. That is the
+                                entire point.
                             </p>
                         </div>
                     </div>
@@ -114,6 +129,7 @@ export default function Confidential() {
                             <strong>$97.91</strong>. Privacy costs nothing in correctness, and either path
                             can be checked against the other.
                         </p>
+                        <PrivateDecision />
                         <div className="block" style={{ maxWidth: 760 }}>
                             <div className="row">
                                 <span>Public path · AdvanceManager</span>

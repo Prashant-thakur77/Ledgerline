@@ -53,6 +53,9 @@ services:
       - EXTENSION_PORT=7702
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - SIMULATED_TEE=${SIMULATED_TEE:-true}
+      # The processor key for COMPUTE_LIMIT_FROM_SOURCE. It exists only inside this container:
+      # instructions carry an account reference and a window, never a credential.
+      - STRIPE_API_KEY=${STRIPE_API_KEY:-}
     depends_on:
       - ext-proxy
 

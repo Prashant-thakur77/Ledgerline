@@ -317,10 +317,25 @@ code {
     gap: 14px;
 }
 
-/* The app's map: three rooms, named in the mono, the current one lit. */
+/* The app's map: the rooms, named in the mono, the current one lit. Scrolls on a phone rather than
+   clipping: a map with rooms missing is worse than one you have to pan. */
 .apptabs {
     display: flex;
     gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: 60vw;
+}
+
+.apptabs::-webkit-scrollbar {
+    display: none;
+}
+
+@media (max-width: 720px) {
+    .apptab {
+        padding: 8px 9px;
+        letter-spacing: 0.08em;
+    }
 }
 
 .apptab {

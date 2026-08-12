@@ -112,10 +112,13 @@ export default function Security() {
                                 attested payloads, never from the caller.
                             </p>
                             <p>
-                                <strong>Trusted, today:</strong> the contract owner holds the policy levers
-                                (tier schedule, fees, terms, pause on originations) and the write-off pen;
-                                the operator re-mints XRPL-side repayments back into the pool, with the
-                                junior buffer absorbing failures first. Repayments are deliberately
+                                <strong>Trusted, today:</strong> the policy levers (tier schedule, fees,
+                                terms, pause on originations) and the write-off pen sit behind an on-chain
+                                timelock: every owner action is proposed publicly and waits out the delay
+                                before it executes, so borrowers and LPs see changes coming. The delay is
+                                an hour on Coston2 so the mechanism is demonstrable; production would carry
+                                days. The operator re-mints XRPL-side repayments back into the pool, with
+                                the junior buffer absorbing failures first. Repayments are deliberately
                                 unpausable, so an operational decision cannot manufacture delinquencies.
                             </p>
                             <p>
@@ -123,6 +126,50 @@ export default function Security() {
                                 advance and stop earning; delinquency is recorded on chain and blocks the
                                 account forever, and that is the whole of the enforcement. The tier schedule
                                 exists so that discovering this costs the attacker more than the advance.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <div className="shell">
+                        <p className="eyebrow">Known limits</p>
+                        <h2>What is still open, and what closing it costs</h2>
+                        <div className="narrow">
+                            <p>
+                                <strong>Distributed default.</strong> One person, many processor accounts,
+                                many small first advances, defaulting on all. Each account needs a month of
+                                attested age and real revenue, so the attack is slow and mostly unprofitable,
+                                but it is bounded by policy rather than by identity. Closing it takes an
+                                identity attestation, which is another Web2Json source, not a redesign.
+                            </p>
+                            <p>
+                                <strong>Refund lag.</strong> Revenue proven this month can be refunded next
+                                month, after an advance is out. The next period prices the collapse
+                                (<code>min(mean, latest)</code>) and processors keep their fees on refunds,
+                                so fabrication still loses money, but a one-cycle window exists. Closing it
+                                tightly means attesting refund totals as their own field.
+                            </p>
+                            <p>
+                                <strong>Nobody is paid to report delinquency.</strong>{" "}
+                                <code>markDelinquent</code> is permissionless but unrewarded. The fix is a
+                                small keeper bounty from the pool, and it is deliberately not deployed this
+                                close to a deadline: a money-touching change ships with tests or not at all.
+                            </p>
+                            <p>
+                                <strong>The API key in calldata: closed.</strong> FDC requests are public,
+                                so on the public path the read-only key travels in the clear. The enclave
+                                path now removes it: a live TEE op reads the processor itself, the
+                                instruction carries only an account reference and a window, and the on-chain
+                                calldata verifiably contains no credential and no revenue figure. Same
+                                decision as the public path.
+                            </p>
+                            <p>
+                                <strong>Jurisdiction.</strong> Revenue-based financing is regulated activity
+                                in most places: loan-versus-sale characterisation, collections, disclosure.
+                                No contract fixes this. A real deployment operates behind a licensed
+                                originator, and the protocol&apos;s job is to make that originator unable to
+                                lie about the numbers.
                             </p>
                         </div>
                     </div>

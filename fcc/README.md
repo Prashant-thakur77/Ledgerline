@@ -21,7 +21,7 @@ The Phase-4 mechanism from [docs/RESOLUTIONS.md](../docs/RESOLUTIONS.md), built 
 
 - The stock scaffold's **16 golden wire-conformance fixtures still pass** with the new op registered
   (`./scripts/test-conformance.sh typescript` — no chain, no Docker, no infrastructure).
-- **60 vitest tests** (54 stock + 6 for the underwriting op, including the recycling bound, the collapse
+- **66 vitest tests** (54 stock + 12 for the underwriting op, including the recycling bound, the collapse
   pricing, and the nothing-but-the-decision output check).
 - **7 Hardhat tests** on `PrivateUnderwriter` in the main suite (wrong signer, wrong measurement, tampered
   figures, stale/future/replayed decisions).
@@ -50,6 +50,16 @@ claim worth making: privacy here costs nothing in correctness. The revenue went 
 out. Reproduce it with `tools/cmd/run-underwrite`, which sends the instruction on chain and polls the
 proxy for the enclave's answer.
 
+**The key never leaves the enclave.** A second product op, `UNDERWRITE / COMPUTE_LIMIT_FROM_SOURCE`,
+closes the public path's one unavoidable disclosure: FDC data providers each call the processor's API, so
+the API key rides in public calldata. In this op the instruction carries only an account reference and a
+month window; the enclave holds the key, calls Stripe itself, and returns the decision. Run live through
+the platform on extension **66184** (sender `0x08c4b3B1…`, machine `0x361bB261…` at PRODUCTION):
+[`0x8a9e9593…`](https://coston2-explorer.flare.network/tx/0x8a9e95937a1843ec76164b5db1fc1633ea274c0bb45137a1635c37d18ed68e88)
+— calldata verifiably contains no credential and no figure, and the decision is $97.91 again. The trust
+trade is explicit: the public path trusts the provider quorum to have read the API honestly; this path
+trusts the attested enclave to have. Reproduce with `tools/cmd/run-underwrite-source`.
+
 Getting there needed the pinned Coston2 indexer credentials, a stable public HTTPS tunnel for the
 extension proxy, and the current pinned version set. Two things cost us the most time and are worth
 writing down: the TEE container bakes its `EXTENSION_ID` at start, so a new extension needs the services
@@ -66,7 +76,7 @@ changes **who vouches for the measurement**, not how anything above is verified.
 
 ```bash
 cd fcc && ./scripts/test-conformance.sh typescript   # 16/16, no infrastructure
-cd fcc/typescript && npx vitest run                  # 60 tests
+cd fcc/typescript && npx vitest run                  # 66 tests
 npx hardhat test test/PrivateUnderwriter.test.ts     # from the repo root
 ```
 

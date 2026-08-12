@@ -83,8 +83,12 @@ auditor reproduces the enclave image to the registered hash.
    which injects auth inside the enclave. Until that exists, the honest position stands: the public-calldata
    key is a testnet demonstration, and the production read path is the enclave.
 
-**Status:** DESIGNED. **Resolved when:** no credential appears in calldata and Stripe's terms are satisfied
-in writing (💰 counsel review).
+**Status:** step 2 is **BUILT AND RUN LIVE** — `UNDERWRITE / COMPUTE_LIMIT_FROM_SOURCE` on the TEE
+platform (extension 66184): the enclave holds the key and reads the processor itself, and the on-chain
+instruction ([`0x8a9e9593…`](https://coston2-explorer.flare.network/tx/0x8a9e95937a1843ec76164b5db1fc1633ea274c0bb45137a1635c37d18ed68e88))
+verifiably carries no credential and no revenue figure. The public-quorum path still discloses its key by
+construction and remains a testnet demonstration; step 1 (platform-held keys via Connect OAuth) stays
+DESIGNED. **Resolved when:** Stripe's terms are satisfied in writing (💰 counsel review).
 
 ## 6. LP currency risk, and XRPL value arriving off-pool
 
@@ -150,3 +154,21 @@ RPC failover across the public endpoints. 💰 ~$5–20/mo VPS, or free tiers wh
 All parameter defaults preserve the deployed V2 semantics exactly (premiums and history steps default to
 zero, junior starts empty), so the live demo's behaviour is unchanged until the next deployment — which is
 deliberately scheduled after the judging window rather than during it.
+
+
+## 9. The remaining map, priced
+
+Kept here so the roadmap is a list of costs rather than wishes.
+
+- **Keeper bounty on `markDelinquent`** — a small reward from the pool for reporting a
+  delinquent advance. Contract change; ships with tests, deliberately not days before a deadline.
+- **Identity attestation against distributed default** — one more Web2Json source (processor KYC
+  status), not a redesign. Bounds how many cold-start accounts one person can farm.
+- **Refund totals as their own attested field** — closes the one-cycle refund-lag window tightly.
+- **Multisig + longer timelock** — the timelock exists and owns the policy today (1h demo-scale);
+  production is days, with a multisig as proposer. 💰 signer ceremony.
+- **Real TEE hardware** — the extension runs on the shared platform today under SIMULATED_TEE;
+  confidential VMs move the code measurement from proxy-reported to hardware-attested.
+  💰 ~$100–500/mo.
+- **Licensed originator** — revenue-based finance is regulated. The protocol's job is to make the
+  originator unable to lie about the numbers; the originator's job is to be allowed to lend. 💰 legal.

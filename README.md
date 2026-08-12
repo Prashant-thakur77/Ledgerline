@@ -197,7 +197,11 @@ Flare's data providers into the enclave:
 | Went in | one proven period, **$3,916.78** |
 | Came back out | `{limitCents: 9791, factorBps: 250, feeBps: 890}` — **and nothing else** |
 
-$97.91 again, from all three paths. The remaining honest caveat — this runs a simulated TEE, so the code
+$97.91 again, from all three paths. A further live op closes the public path's one unavoidable
+disclosure: the enclave holds the API key and reads the processor itself, so the instruction carries only
+an account reference and a window
+([`0x8a9e9593…`](https://coston2-explorer.flare.network/tx/0x8a9e95937a1843ec76164b5db1fc1633ea274c0bb45137a1635c37d18ed68e88)
+— the calldata verifiably contains no credential and no revenue figure). The remaining honest caveat — this runs a simulated TEE, so the code
 measurement is reported by the proxy rather than attested by confidential hardware — lives in
 [fcc/README.md](fcc/README.md).
 
@@ -226,6 +230,10 @@ and its full repayment closing the books exactly
 | `AdvanceManager` | [`0x24f2c925679e737174103A5F6715b766E3D5D602`](https://coston2-explorer.flare.network/address/0x24f2c925679e737174103A5F6715b766E3D5D602#code) |
 | `LenderPool` (ERC-4626) | [`0x38560eE630071846158F639a217E6a0fB2d66Fe2`](https://coston2-explorer.flare.network/address/0x38560eE630071846158F639a217E6a0fB2d66Fe2#code) |
 | `PrivateUnderwriter` (Confidential Compute) | [`0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a`](https://coston2-explorer.flare.network/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code) |
+| `GovernanceTimelock` (owns manager + pool) | [`0xB0aBFA468a84467a0F9579b6458AFBBfc4f33FE5`](https://coston2-explorer.flare.network/address/0xB0aBFA468a84467a0F9579b6458AFBBfc4f33FE5#code) |
+
+The underwriting policy is behind the timelock: every owner action waits in public (an hour on Coston2,
+demo-scale; days in production) before it executes.
 
 Superseded generations, kept because evidence cited in this document ran on them:
 

@@ -246,6 +246,7 @@ export default function Docs() {
                                 ["AdvanceManager", MANAGER_ADDRESS],
                                 ["LenderPool", POOL_ADDRESS],
                                 ["PrivateUnderwriter", "0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a"],
+                                ["GovernanceTimelock", "0xB0aBFA468a84467a0F9579b6458AFBBfc4f33FE5"],
                             ].map(([name, addr]) => (
                                 <div className="row" key={name}>
                                     <span>{name}</span>

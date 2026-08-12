@@ -15,3 +15,4 @@ export const OP_COMMAND_SAY_GOODBYE = "SAY_GOODBYE";
 // ── Ledgerline private underwriting ──────────────────────────────────────────
 export const OP_TYPE_UNDERWRITE = "UNDERWRITE";
 export const OP_COMMAND_COMPUTE_LIMIT = "COMPUTE_LIMIT";
+export const OP_COMMAND_COMPUTE_LIMIT_FROM_SOURCE = "COMPUTE_LIMIT_FROM_SOURCE";
