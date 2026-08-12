@@ -5,7 +5,9 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { LenderPool } from "./LenderPool.sol";
 import { ContractRegistry } from "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
 import { IPayment } from "@flarenetwork/flare-periphery-contracts/coston2/IPayment.sol";
 import { RevenueOracle } from "./RevenueOracle.sol";
@@ -32,7 +34,7 @@ interface IFAssetRedeemer {
  * This is unsecured credit. There is no on-chain recovery if a borrower stops earning; delinquency is
  * recorded and blocks future advances, and that is the whole of the enforcement.
  */
-contract AdvanceManager is Ownable, ReentrancyGuard {
+contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     struct Advance {
@@ -95,6 +97,16 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     IFAssetRedeemer public assetManager;
 
     /**
+     * @notice The lender pool. Optional: unset, the manager funds advances from its owner-filled treasury,
+     * which is the mode the first deployments ran in. Set, all funding flows through the pool and the
+     * treasury functions refuse to run — one funding source at a time, never a blend of both.
+     */
+    LenderPool public pool;
+
+    /// @notice Per advance: how much of its disbursed FXRP the pool has already retired via repayments.
+    mapping(bytes32 => uint256) public fxrpRetired;
+
+    /**
      * @notice The chain an XRPL repayment must have happened on, as an FDC source id.
      * `bytes32("testXRP")` on Coston2, `bytes32("XRP")` in production. Pinning it stops a payment on one
      * chain being replayed as proof of a payment on another.
@@ -152,6 +164,9 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     event AssetManagerSet(address assetManager);
     event MarkedDelinquent(bytes32 indexed accountId, uint256 outstandingCents);
     event FactorScheduleSet(uint16 baseFactorBps, uint16 stepFactorBps, uint16 capFactorBps, uint64 minAccountAgeSeconds);
+    event PoolSet(address pool);
+    /// @notice The unrecovered remainder of a delinquent advance, formally taken as the pool's loss.
+    event WrittenOff(bytes32 indexed accountId, uint256 outstandingCents, uint256 fxrpWrittenOff);
     event XrplTreasurySet(string xrplAddress, bytes32 xrplAddressHash, bytes32 sourceId);
     /// @notice A repayment that arrived as real XRP on the XRP Ledger and was proven by FDC.
     event RepaidFromXrpl(
@@ -178,6 +193,9 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     error InvalidXrplAddress();
     error XrplDisbursementUnavailable();
     error XrplRepaymentUnavailable();
+    error TreasuryModeDisabled();
+    error PoolAlreadyActive();
+    error NotDelinquent();
     error InvalidPaymentProof();
     error WrongPaymentChain(bytes32 expected, bytes32 got);
     error PaymentNotSuccessful(uint8 status);
@@ -236,8 +254,8 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
     // ---------------------------------------------------------------- advances
 
-    /// @notice Take an advance in FXRP, on Flare.
-    function requestAdvance(bytes32 accountId, uint256 usdCents) external nonReentrant {
+    /// @notice Take an advance in FXRP, on Flare. Pausable: originations stop, repayments never do.
+    function requestAdvance(bytes32 accountId, uint256 usdCents) external nonReentrant whenNotPaused {
         if (usdCents == 0) revert InvalidAmount();
 
         (uint256 price, int8 priceDecimals) = _xrpUsd();
@@ -248,8 +266,12 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
         address borrower = _openAdvance(accountId, usdCents, fxrpAmount, price, priceDecimals);
 
-        treasuryBalance -= fxrpAmount;
-        fxrp.safeTransfer(borrower, fxrpAmount);
+        if (address(pool) != address(0)) {
+            pool.lend(borrower, fxrpAmount);
+        } else {
+            treasuryBalance -= fxrpAmount;
+            fxrp.safeTransfer(borrower, fxrpAmount);
+        }
     }
 
     /**
@@ -265,7 +287,7 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         bytes32 accountId,
         uint256 lots,
         string calldata xrplAddress
-    ) external nonReentrant {
+    ) external nonReentrant whenNotPaused {
         if (lots == 0) revert InvalidAmount();
         if (bytes(xrplAddress).length == 0) revert InvalidXrplAddress();
 
@@ -282,7 +304,12 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
         address borrower = _openAdvance(accountId, usdCents, fxrpAmount, price, priceDecimals);
 
-        treasuryBalance -= fxrpAmount;
+        // The redemption burns FXRP from this contract, so the pool lends to the manager itself here.
+        if (address(pool) != address(0)) {
+            pool.lend(address(this), fxrpAmount);
+        } else {
+            treasuryBalance -= fxrpAmount;
+        }
         fxrp.forceApprove(address(redeemer), fxrpAmount);
         redeemer.redeem(lots, xrplAddress, payable(address(0)));
 
@@ -312,7 +339,8 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
         uint256 limit = advanceLimitCents(accountId);
         if (usdCents > limit) revert ExceedsLimit(limit, usdCents);
-        if (fxrpAmount > treasuryBalance) revert InsufficientTreasury(treasuryBalance, fxrpAmount);
+        uint256 available = availableFunds();
+        if (fxrpAmount > available) revert InsufficientTreasury(available, fxrpAmount);
 
         uint256 fee = (usdCents * feeBps) / 10_000;
 
@@ -383,7 +411,6 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
 
         advance.outstandingCents -= usdCents;
         advance.lastActivityAt = uint64(block.timestamp);
-        treasuryBalance += fxrpAmount;
 
         bool closed = advance.outstandingCents == 0;
         if (closed) {
@@ -392,12 +419,42 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
             if (!advance.delinquent) closedCleanCycles[accountId] += 1;
         }
 
-        fxrp.safeTransferFrom(borrower, address(this), fxrpAmount);
+        if (address(pool) != address(0)) {
+            uint256 retired = _retire(accountId, advance, usdCents, closed);
+            fxrp.safeTransferFrom(borrower, address(pool), fxrpAmount);
+            pool.onRepayment(fxrpAmount, retired);
+        } else {
+            treasuryBalance += fxrpAmount;
+            fxrp.safeTransferFrom(borrower, address(this), fxrpAmount);
+        }
 
         emit Repaid(
             accountId, borrower, usdCents, fxrpAmount, price, priceDecimals, advance.outstandingCents, automatic
         );
         if (closed) emit AdvanceClosed(accountId);
+    }
+
+    /**
+     * @dev How much of this advance's disbursed FXRP a repayment of `usdCents` retires from the pool's
+     * books: the dollar share of the total owed at origination, applied to the FXRP that actually left.
+     * The final repayment retires the exact remainder, so rounding can never strand a residue.
+     */
+    function _retire(
+        bytes32 accountId,
+        Advance storage advance,
+        uint256 usdCents,
+        bool closed
+    ) internal returns (uint256 retired) {
+        uint256 alreadyRetired = fxrpRetired[accountId];
+        if (closed) {
+            retired = advance.fxrpDisbursed - alreadyRetired;
+        } else {
+            uint256 totalOwedAtOpen = advance.principalCents + advance.feeCents;
+            retired = (advance.fxrpDisbursed * usdCents) / totalOwedAtOpen;
+            uint256 remaining = advance.fxrpDisbursed - alreadyRetired;
+            if (retired > remaining) retired = remaining;
+        }
+        fxrpRetired[accountId] = alreadyRetired + retired;
     }
 
     /**
@@ -463,11 +520,16 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         }
 
         /*
-         * Deliberately no change to `treasuryBalance`. The XRP landed in an XRP Ledger account, not as FXRP
-         * on Flare, so the Flare-side treasury genuinely did not grow and claiming otherwise would put a
-         * number in storage that no balance backs. Returning that value to the treasury means minting FXRP
-         * from the received XRP through FAssets, which is the production answer and is not built here.
+         * Deliberately no FXRP inflow recorded. The XRP landed in an XRP Ledger account, not as FXRP on
+         * Flare, so claiming a balance grew here would put a number in storage that nothing backs. With a
+         * pool attached the retired principal is booked with zero inflow — the share price visibly dips
+         * until the operator re-mints that XRP through FAssets and returns it with a plain transfer, which
+         * is disclosed in the pool's own documentation rather than smoothed over.
          */
+        if (address(pool) != address(0)) {
+            uint256 retired = _retire(accountId, advance, usdCents, closed);
+            pool.onRepayment(0, retired);
+        }
         emit RepaidFromXrpl(
             accountId, transactionId, drops, usdCents, price, priceDecimals, advance.outstandingCents
         );
@@ -484,9 +546,40 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         emit MarkedDelinquent(accountId, advance.outstandingCents);
     }
 
+    /**
+     * @notice Take the loss on a delinquent advance, formally. Delinquency is a fact; a write-off is an
+     * accounting decision, so it is separate, owner-gated, and only possible after a second full grace
+     * period of silence. The advance closes uncollectable; with a pool attached, the unrecovered FXRP
+     * leaves its books and every share takes the loss at once, visibly.
+     * @dev The account itself stays delinquent, which permanently blocks further advances to it.
+     */
+    function writeOff(bytes32 accountId) external onlyOwner nonReentrant {
+        Advance storage advance = _advances[accountId];
+        if (!advance.open) revert NoOpenAdvance();
+        if (!advance.delinquent) revert NotDelinquent();
+        if (block.timestamp <= advance.lastActivityAt + 2 * uint256(gracePeriod)) {
+            revert GracePeriodNotElapsed();
+        }
+
+        uint256 lostCents = advance.outstandingCents;
+        uint256 lostFxrp = advance.fxrpDisbursed - fxrpRetired[accountId];
+
+        advance.outstandingCents = 0;
+        advance.open = false;
+        fxrpRetired[accountId] = advance.fxrpDisbursed;
+
+        if (address(pool) != address(0) && lostFxrp > 0) {
+            pool.onWriteOff(lostFxrp);
+        }
+
+        emit WrittenOff(accountId, lostCents, lostFxrp);
+        emit AdvanceClosed(accountId);
+    }
+
     // ---------------------------------------------------------------- treasury
 
     function depositTreasury(uint256 amount) external onlyOwner nonReentrant {
+        if (address(pool) != address(0)) revert TreasuryModeDisabled();
         if (amount == 0) revert InvalidAmount();
         treasuryBalance += amount;
         fxrp.safeTransferFrom(msg.sender, address(this), amount);
@@ -557,6 +650,32 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     function setAssetManager(address newAssetManager) external onlyOwner {
         assetManager = IFAssetRedeemer(newAssetManager);
         emit AssetManagerSet(newAssetManager);
+    }
+
+    /**
+     * @notice Attach the lender pool. One funding source at a time: the owner treasury must be empty, and
+     * once a pool has lent anything it cannot be swapped out from under its own receivables.
+     */
+    function setPool(address newPool) external onlyOwner {
+        if (treasuryBalance != 0) revert TreasuryModeDisabled();
+        if (address(pool) != address(0) && pool.lentFxrp() != 0) revert PoolAlreadyActive();
+        pool = LenderPool(newPool);
+        emit PoolSet(newPool);
+    }
+
+    /// @notice Stop originations. Repayments are deliberately unpausable — trapping them would manufacture
+    /// delinquencies out of an operational decision.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /// @notice What can actually fund an advance right now, whichever mode is active.
+    function availableFunds() public view returns (uint256) {
+        return address(pool) != address(0) ? pool.availableToLend() : treasuryBalance;
     }
 
     /**
