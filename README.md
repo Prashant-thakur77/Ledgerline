@@ -499,6 +499,9 @@ key and a guard that refuses an `sk_` key outright, but it deserves a warning at
 
 ## Roadmap
 
+The short version is below. The deep plan — per-phase goals, exact contract changes, tests,
+risks and acceptance criteria — is in [docs/ROADMAP.md](docs/ROADMAP.md).
+
 1. **Repayment in smaller amounts, and from any XRPL account.** The return leg is built, deployed and run on
    chain — see *The loop closes* above. Two limits remain. A repayment currently has to come from an account
    whose payment is attested individually, which costs an FDC request per repayment; batching several
