@@ -46,11 +46,12 @@ export function ParticleField() {
          */
         type P3 = { x: number; y: number; z: number; r: number };
         let points: P3[] = [];
-        let angleY = 0;
-        let angleX = 0.35;
-        // The pointer steers the rotation a little: attention tilts the cloud.
-        let targetTilt = 0;
-        let tilt = 0;
+        let spin = 0; // slow idle rotation, always on
+        // The cloud turns to face the cursor on both axes, springing there smoothly.
+        let targetYaw = 0;
+        let targetPitch = 0;
+        let yaw = 0;
+        let pitch = 0;
 
         const FOCAL = 720;
         const RADIUS = 340;
@@ -81,7 +82,8 @@ export function ParticleField() {
         }
 
         const onPointer = (e: PointerEvent) => {
-            targetTilt = (e.clientX / window.innerWidth - 0.5) * 0.5;
+            targetYaw = (e.clientX / window.innerWidth - 0.5) * 1.3;
+            targetPitch = (e.clientY / window.innerHeight - 0.5) * 0.9;
         };
         window.addEventListener("pointermove", onPointer, { passive: true });
 
@@ -89,13 +91,15 @@ export function ParticleField() {
             if (!running) return;
             ctx!.clearRect(0, 0, width, height);
 
-            angleY += 0.0016;
-            tilt += (targetTilt - tilt) * 0.03;
-            const cy = Math.cos(angleY + tilt), sy = Math.sin(angleY + tilt);
-            const cx = Math.cos(angleX), sx = Math.sin(angleX);
+            spin += 0.0013;
+            yaw += (targetYaw - yaw) * 0.055;
+            pitch += (targetPitch - pitch) * 0.055;
+            const cy = Math.cos(spin + yaw), sy = Math.sin(spin + yaw);
+            const cx = Math.cos(0.3 + pitch), sx = Math.sin(0.3 + pitch);
 
-            const cxPix = width * 0.62; // the cloud sits off-centre, behind the copy's right shoulder
-            const cyPix = height * 0.44;
+            // Well off to the right on wide screens; centred where there is no right to speak of.
+            const cxPix = width * (width < 720 ? 0.5 : 0.78);
+            const cyPix = height * 0.42;
 
             // Rotate and project once per frame; reuse for both passes.
             const proj: { X: number; Y: number; s: number; p: P3 }[] = [];
@@ -115,9 +119,9 @@ export function ParticleField() {
                     const d2 = dx * dx + dy * dy;
                     if (d2 > LINK_SQ) continue;
                     const depth = (proj[i].s + proj[j].s) / 2;
-                    const alpha = (1 - d2 / LINK_SQ) * 0.42 * depth;
+                    const alpha = (1 - d2 / LINK_SQ) * 0.6 * depth;
                     ctx!.strokeStyle = `rgba(230, 32, 88, ${alpha})`;
-                    ctx!.lineWidth = 0.7 * depth;
+                    ctx!.lineWidth = 0.85 * depth;
                     ctx!.beginPath();
                     ctx!.moveTo(proj[i].X, proj[i].Y);
                     ctx!.lineTo(proj[j].X, proj[j].Y);
@@ -127,8 +131,8 @@ export function ParticleField() {
 
             for (const q of proj) {
                 // Far points cool toward the violet field; near ones warm toward ink.
-                const a = 0.18 + 0.45 * (q.s - 0.35);
-                ctx!.fillStyle = q.s > 0.95 ? `rgba(244, 242, 238, ${a})` : `rgba(170, 150, 255, ${a})`;
+                const a = 0.32 + 0.55 * (q.s - 0.35);
+                ctx!.fillStyle = q.s > 0.95 ? `rgba(250, 248, 244, ${a})` : `rgba(186, 168, 255, ${a})`;
                 ctx!.beginPath();
                 ctx!.arc(q.X, q.Y, q.p.r * q.s, 0, Math.PI * 2);
                 ctx!.fill();
