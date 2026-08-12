@@ -11,7 +11,7 @@ Work from `/home/prashant/projects/flare`. Every command assumes that directory 
 
 | | |
 |---|---|
-| Contracts | Written, 65 tests passing, both source-verified on Coston2 |
+| Contracts | Written, 129 tests passing, all source-verified on Coston2 |
 | Revenue attestation | Working, run on chain four times from real Stripe API calls |
 | Live attestation console | Built and verified end to end (116s) |
 | XRPL repayment leg | Written, 19 tests, mechanism verified on real infrastructure — **not deployed** |

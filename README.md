@@ -24,11 +24,12 @@ these six places:**
 
 | Path | What it is |
 |---|---|
-| [`contracts/ledgerline/`](contracts/ledgerline/) | The two contracts. ~330 lines of Solidity, both source-verified on chain. |
-| [`test/`](test/) | 65 tests. `RevenueOracle` (13), `AdvanceManager` (23), `AdvanceToXrpl` (10), `RepayFromXrpl` (19). |
+| [`contracts/ledgerline/`](contracts/ledgerline/) | Four contracts — oracle, manager, lender pool, private underwriter — all source-verified on chain. |
+| [`test/`](test/) | 129 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 200-step invariant walk. |
 | [`scripts/ledgerline/`](scripts/ledgerline/) | Deploy, attest, borrow, repay, redeem to XRPL, and a one-screen state dump. |
 | [`web/app/`](web/app/) | The interface, including the live attestation console and its two API routes. |
 | [`web/lib/`](web/lib/) | The Flare protocol layer the browser drives an attestation with. |
+| [`fcc/`](fcc/) | The Confidential Compute extension: private underwriting on Flare's own scaffold. |
 | [`docs/`](docs/) | Phase 0 validation, deployment record, demo script, blockers. |
 
 Nothing else in the repository was modified. The starter's examples were used only to validate the
@@ -215,7 +216,7 @@ Both contracts are source-verified on the explorer. Full deployment notes in [do
 ```bash
 cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
 yarn install
-yarn hardhat test             # 65 tests
+yarn hardhat test             # 129 tests
 
 # fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
 yarn hardhat run scripts/ledgerline/deploy.ts --network coston2

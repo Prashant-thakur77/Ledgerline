@@ -8,7 +8,7 @@ The dependency spine: **1 → 2 → (3 ∥ 4) → 5 → 6**, with **7 running al
 Phase 1 is first not because it is easiest but because every later phase amplifies its absence — a lender
 pool built over recyclable revenue is a machine for losing other people's money.
 
-Current state assumed throughout: `RevenueOracle` + `AdvanceManager` on Coston2, 65 tests, two FDC
+Current state assumed throughout: `RevenueOracle` + `AdvanceManager` on Coston2, 129 tests, two FDC
 attestation types live (Web2Json in, Payment back), both money legs run on chain, single owner-funded
 treasury, web app at ledgerline-flare.vercel.app.
 
