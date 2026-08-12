@@ -280,7 +280,7 @@ export default function Landing() {
                                 },
                                 {
                                     h: "Public revenue is the adoption blocker",
-                                    p: "Almost no business will publish its monthly revenue permanently. The fix is Flare Confidential Compute: underwrite inside a TEE, publish only the decision. Specified in the README, deliberately not built.",
+                                    p: "Almost no business will publish its monthly revenue permanently. The fix is Flare Confidential Compute, and it is built: our extension is registered on Flare's TEE platform, and its data providers have carried a real underwriting instruction into the enclave. $3,916.78 of proven revenue went in, a $97.91 limit came out, and the revenue appears nowhere. Same answer as the public path.",
                                 },
                             ].map((c, i) => (
                                 <Reveal key={c.h} delay={i * 90} className="card">

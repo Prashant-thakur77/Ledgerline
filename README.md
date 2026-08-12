@@ -184,9 +184,21 @@ before storing it:
 | The public-path limit for the same account, same policy | **$97.91 — identical** |
 
 Two trust models, one answer: the FDC provider-quorum path and the enclave path price the account the same,
-which is what lets them coexist as a choice rather than a migration. Platform registration (which would move
-the signing key into attested hardware) is achievable on Coston2 with hackathon-pinned indexer
-credentials but is an infrastructure gauntlet of its own; the honest status lives in
+which is what lets them coexist as a choice rather than a migration.
+
+**That extension is now registered on Flare's shared TEE platform**, and the same underwriting has since
+been executed *by the platform itself* rather than locally — extension **66180**, TEE machine
+`0x0f42321d…` at status **PRODUCTION**, with an `UNDERWRITE / COMPUTE_LIMIT` instruction routed through
+Flare's data providers into the enclave:
+
+| | |
+|---|---|
+| Instruction sent on chain | [`0x7b77dc2f…`](https://coston2-explorer.flare.network/tx/0x7b77dc2fe6e733761c35568f8ff013b74f3d98a408642a57e770c38b0f864131) |
+| Went in | one proven period, **$3,916.78** |
+| Came back out | `{limitCents: 9791, factorBps: 250, feeBps: 890}` — **and nothing else** |
+
+$97.91 again, from all three paths. The remaining honest caveat — this runs a simulated TEE, so the code
+measurement is reported by the proxy rather than attested by confidential hardware — lives in
 [fcc/README.md](fcc/README.md).
 
 ## Deployed on Coston2 (chain id 114)
@@ -469,12 +481,17 @@ verified privately · underwriting run in tee · attestation 0x4c19…8de2 ↗
 The figure above it becomes the limit rather than the earnings. A judge reading that line understands
 immediately that the number was computed on data they cannot see and still cannot be faked.
 
-**This is deliberately not built.** The Confidential Compute stack is difficult right now — teams in the
-hackathon have lost days to a redeploy that wiped extension registrations, to indexer credentials, to Docker
-image hash matching across TEE machines, and to version mismatches between `tee-node` and `tee-proxy`. Taking
-that risk with a complete, working, deployed product five days from the deadline would be a bad trade. The
-honest move is to name the weakness, show that the fix is understood and specified, and ship the thing that
-works.
+**This is built, registered, and has run.** The extension lives in [`fcc/`](fcc/), the verifier contract is
+[`PrivateUnderwriter`](https://coston2-explorer.flare.network/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code),
+and Flare's own data providers have carried a real `UNDERWRITE / COMPUTE_LIMIT` instruction into our enclave
+on Coston2 — $3,916.78 of proven revenue in, a $97.91 limit out, the revenue itself appearing nowhere
+([`0x7b77dc2f…`](https://coston2-explorer.flare.network/tx/0x7b77dc2fe6e733761c35568f8ff013b74f3d98a408642a57e770c38b0f864131)).
+
+The stack is genuinely difficult — teams in this hackathon lost days to wiped extension registrations,
+indexer credentials, image-hash matching and `tee-node`/`tee-proxy` version skew, and it cost us a full
+evening too. What is *not* yet claimed is confidential hardware: this is a simulated TEE, so the code
+measurement is reported by the proxy rather than attested by silicon. That upgrade changes who vouches for
+the measurement, not how any of the above is verified.
 
 ## Network, testing and what has actually been exercised
 

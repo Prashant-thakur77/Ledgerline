@@ -26,20 +26,41 @@ The Phase-4 mechanism from [docs/RESOLUTIONS.md](../docs/RESOLUTIONS.md), built 
 - **7 Hardhat tests** on `PrivateUnderwriter` in the main suite (wrong signer, wrong measurement, tampered
   figures, stale/future/replayed decisions).
 
-## What is deliberately not claimed
+## It is registered, and it ran
 
-Registration on Flare's shared TEE platform is access-gated, and the shape of that gate matters:
-the scaffold's deployment docs describe a VPN-gated indexer, but that applies to **Coston**. Per the
-hackathon channel, **Coston2's** indexer (34.38.42.208:3306) is reachable with read-only hackathon
-credentials pinned in the official Telegram, and `SIMULATED_TEE=true` machines are organizer-supported
-through to PRODUCTION. So registration here is achievable rather than blocked; it needs the pinned
-credentials, a stable public HTTPS tunnel for the extension proxy, and the current pinned version set —
-and the channel shows teams losing hours to proxy 404s and version skew even so. This integration
-currently stops at the line before that infrastructure gauntlet:
-the extension is wire-conformant and the verifier contract is tested, and until platform registration the
-"enclave key" is whatever governance sets. Registration upgrades **who holds the key**, not how anything
-is verified. `SIMULATED_TEE=true` runs the whole stack on a laptop; real confidential hardware is a
-production cost (💰) noted in the resolutions map.
+The extension is live on Flare's shared TEE platform on Coston2, and our own operation — not the
+scaffold's greeting — has been executed by it end to end.
+
+| | |
+|---|---|
+| Extension ID | **66180** (`0x10284`) |
+| InstructionSender | [`0xd7DADF66AF4dA4C5FF0Ccdcccc77db1a46520341`](https://coston2-explorer.flare.network/address/0xd7DADF66AF4dA4C5FF0Ccdcccc77db1a46520341) |
+| TEE machine | `0x0f42321d590876FC4aEC0DfaA13c5993e8B22103` — status **2 (PRODUCTION)**, sole active machine for 66180 |
+| Attested code hash | `0x194844cf417dde867073e5ab7199fa4d21fd82b5dbe2bdea8b3d7fc18d10fdc2` (platform `TEST_PLATFORM`) |
+| Governance | 1 signer, threshold 1, hash `0x4d582fb73a5476a8a4a9bad4bd02be3642575fb2b5093aaa90d34e459e10090d` |
+
+The live `UNDERWRITE / COMPUTE_LIMIT` run:
+
+- **tx** [`0x7b77dc2fe6e733761c35568f8ff013b74f3d98a408642a57e770c38b0f864131`](https://coston2-explorer.flare.network/tx/0x7b77dc2fe6e733761c35568f8ff013b74f3d98a408642a57e770c38b0f864131) (block 33,981,358)
+- **instruction** `0x95bdc4ca15000b9a7d22745c3989eb61f903964e5edf825292fe89125372d6c7`
+- **in**: one proven period worth $3,916.78. **out**: `{limitCents: 9791, factorBps: 250, feeBps: 890, periodsUsed: 1}`
+
+$97.91 — the same figure the public `AdvanceManager` path produces for the same account, which is the
+claim worth making: privacy here costs nothing in correctness. The revenue went in and did not come back
+out. Reproduce it with `tools/cmd/run-underwrite`, which sends the instruction on chain and polls the
+proxy for the enclave's answer.
+
+Getting there needed the pinned Coston2 indexer credentials, a stable public HTTPS tunnel for the
+extension proxy, and the current pinned version set. Two things cost us the most time and are worth
+writing down: the TEE container bakes its `EXTENSION_ID` at start, so a new extension needs the services
+recreated rather than restarted — otherwise every tool silently registers against the old one; and the Go
+tools read `.env` from the project root, so running them from `tools/` falls back to an unfunded Hardhat
+key and reverts with a bare `execution reverted`.
+
+**What is still not claimed:** this runs `SIMULATED_TEE=true` — organizer-supported on Coston2 and
+registered through to PRODUCTION, but the code measurement is reported by the proxy rather than attested
+by real confidential hardware. That upgrade is a production cost (💰) noted in the resolutions map. It
+changes **who vouches for the measurement**, not how anything above is verified.
 
 ## Run it
 
@@ -47,6 +68,20 @@ production cost (💰) noted in the resolutions map.
 cd fcc && ./scripts/test-conformance.sh typescript   # 16/16, no infrastructure
 cd fcc/typescript && npx vitest run                  # 60 tests
 npx hardhat test test/PrivateUnderwriter.test.ts     # from the repo root
+```
+
+Against the live platform (needs the services up, a public proxy tunnel, and a funded key in `fcc/.env`):
+
+```bash
+cd fcc
+./scripts/start-services.sh && ./scripts/pre-build.sh && ./scripts/post-build.sh
+./scripts/test.sh                                    # the scaffold's ops, through real data providers
+set -a; source ./.env; set +a                        # the Go tools read .env from the project root
+cd tools && go run ./cmd/run-underwrite \
+  -a ../config/coston2/deployed-addresses.json \
+  -c "$CHAIN_URL" -p "$EXT_PROXY_URL" \
+  -instructionSender "$INSTRUCTION_SENDER" \
+  -input ../../docs/examples/underwrite-request.json
 ```
 
 Everything outside `typescript/src/app`, `README.md` and this directory's test additions is the scaffold

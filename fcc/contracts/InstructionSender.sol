@@ -23,6 +23,11 @@ contract HelloWorldInstructionSender {
     // forge-lint: disable-next-line(unsafe-typecast)
     bytes32 public constant OP_COMMAND_SAY_GOODBYE = bytes32("SAY_GOODBYE");
 
+    /// @notice Proofline's own operation: underwrite a revenue history inside the enclave.
+    /// Revenue goes in; only the limit, tier and fee come out. Never an "F_" prefix, which is reserved.
+    bytes32 public constant OP_TYPE_UNDERWRITE = bytes32("UNDERWRITE");
+    bytes32 public constant OP_COMMAND_COMPUTE_LIMIT = bytes32("COMPUTE_LIMIT");
+
     /// @notice Reference to the TEE extension registry contract.
     ITeeExtensionRegistry public immutable TEE_EXTENSION_REGISTRY;
     /// @notice Reference to the TEE machine registry contract.
@@ -102,6 +107,30 @@ contract HelloWorldInstructionSender {
             teeIds,
             params
         );
+    }
+
+    /**
+     * @notice Send a revenue history into the enclave and get an underwriting decision back.
+     * @param _message JSON payload: {accountId, periods[], accountCreatedAt, closedCleanCycles, nowTs}.
+     *
+     * The figures travel to the TEE through Flare's data providers, and what returns is the decision
+     * alone. This is the privacy property the whole Confidential Compute path exists for: a limit that
+     * everyone can verify, computed from revenue nobody but the enclave ever saw.
+     */
+    function sendComputeLimit(bytes calldata _message) external payable {
+        address[] memory teeIds = TEE_MACHINE_REGISTRY.getRandomTeeIds(_getExtensionId(), 1);
+        address[] memory cosigners = new address[](0);
+
+        ITeeExtensionRegistry.TeeInstructionParams memory params = ITeeExtensionRegistry.TeeInstructionParams({
+            opType: OP_TYPE_UNDERWRITE,
+            opCommand: OP_COMMAND_COMPUTE_LIMIT,
+            message: _message,
+            cosigners: cosigners,
+            cosignersThreshold: 0,
+            claimBackAddress: msg.sender
+        });
+
+        TEE_EXTENSION_REGISTRY.sendInstructions{value: msg.value}(teeIds, params);
     }
 
     /// @notice Sends a SAY_GOODBYE instruction to the TEE.

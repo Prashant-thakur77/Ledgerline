@@ -35,6 +35,7 @@ const NAMED: Record<string, string> = {
     "0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66": "AdvanceManager (superseded)",
     "0x5774E51335277893c5f177bb6735b4CF2fE76A63": "AdvanceManager (superseded)",
     "0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8": "RevenueOracle (superseded)",
+    "0xd7DADF66AF4dA4C5FF0Ccdcccc77db1a46520341": "FCC InstructionSender (extension 66180)",
     "0x0b6A3645c240605887a5532109323A3E12273dc7": "FXRP (FTestXRP)",
     "0x48aC463d7975828989331F4De43341627b9c5f1D": "FdcHub",
 };

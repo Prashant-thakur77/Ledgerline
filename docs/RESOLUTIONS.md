@@ -56,15 +56,18 @@ underwriting runs inside an attested enclave, only `(accountId, limit, tier)` em
 the code hash instead of the revenue. Dual-mode: the public-quorum path stays for anyone who prefers
 provider consensus over attested hardware.
 
-**Status:** partially **BUILT** — see [`fcc/`](../fcc/): the underwriting extension is implemented on
+**Status:** **BUILT AND REGISTERED** — see [`fcc/`](../fcc/): the underwriting extension is implemented on
 Flare's own scaffold (wire-conformant, 16/16 golden fixtures, 60 unit tests, no revenue in its output by
-test), and `PrivateUnderwriter.sol` verifies enclave-signed decisions against a registered code measurement
-(7 tests). What remains is platform registration. Correction from the hackathon channel: Coston2's
-indexer is not VPN-gated (that is Coston); it takes pinned hackathon credentials, and simulated TEEs are
-supported to PRODUCTION — so registration is achievable, at the cost of an infrastructure gauntlet
-(stable HTTPS tunnel, pinned version set, flaky availability-check polling) that the channel shows eating
-teams' hours. The enclave path stays out of the live product until that registration exists. 💰 enclave hosting
-(~$100–500/mo on confidential VMs) when built.
+test), `PrivateUnderwriter.sol` verifies enclave-signed decisions against a registered code measurement
+(7 tests), and the extension is now **registered on Flare's shared TEE platform on Coston2** — extension
+66180, machine `0x0f42321d…` at status PRODUCTION, code hash `0x194844cf…` whitelisted. Flare's data
+providers have routed a live `UNDERWRITE / COMPUTE_LIMIT` instruction into it
+([`0x7b77dc2f…`](https://coston2-explorer.flare.network/tx/0x7b77dc2fe6e733761c35568f8ff013b74f3d98a408642a57e770c38b0f864131)):
+$3,916.78 of proven revenue in, a $97.91 limit out, matching the public path exactly, with no revenue
+figure in the response. The infrastructure gauntlet was real (stable HTTPS tunnel, pinned version set,
+container-baked extension ids, flaky availability-check polling) and cost an evening. Remaining: this is a
+**simulated** TEE, so the measurement is proxy-reported rather than hardware-attested. 💰 enclave hosting
+(~$100–500/mo on confidential VMs) for the hardware upgrade.
 **Resolved when:** an account is underwritten with no revenue figure anywhere on chain, and an outside
 auditor reproduces the enclave image to the registered hash.
 
