@@ -13,13 +13,13 @@
  */
 
 :root {
-    /* ground — deep space with an indigo undertone, not flat black */
-    --ground: #070510;
-    --ground-deep: #0b0718;
-    --surface: #100b1e;
-    --raised: #171129;
-    --hairline: rgba(190, 170, 255, 0.10);
-    --hairline-firm: rgba(190, 170, 255, 0.18);
+    /* ground — editorial ink black, one warm undertone, nothing fighting the type */
+    --ground: #050507;
+    --ground-deep: #0a090d;
+    --surface: #0d0c11;
+    --raised: #131218;
+    --hairline: rgba(235, 230, 240, 0.08);
+    --hairline-firm: rgba(235, 230, 240, 0.16);
 
     /* ink */
     --ink: #f4f2ee;
@@ -81,10 +81,8 @@ body {
     /* A slow wash of colour behind everything, so the page is never flat black: pink at the crown,
        violet mid-field, the warm ember low — depth reads as three light sources, not a gradient. */
     background-image:
-        radial-gradient(60rem 40rem at 12% -8%, rgba(230, 32, 88, 0.14), transparent 60%),
-        radial-gradient(70rem 50rem at 78% 30%, rgba(124, 92, 255, 0.10), transparent 65%),
-        radial-gradient(48rem 34rem at 8% 88%, rgba(255, 122, 69, 0.07), transparent 62%),
-        linear-gradient(180deg, var(--ground-deep) 0%, var(--ground) 42%, #050310 100%);
+        radial-gradient(64rem 44rem at 16% -10%, rgba(230, 32, 88, 0.11), transparent 60%),
+        linear-gradient(180deg, var(--ground-deep) 0%, var(--ground) 46%, #030304 100%);
     background-attachment: fixed;
 }
 
@@ -108,22 +106,26 @@ main {
 h1,
 h2,
 h3 {
-    letter-spacing: -0.03em;
-    line-height: 1.06;
+    letter-spacing: -0.01em;
+    line-height: 1.04;
     margin: 0;
     text-wrap: balance;
 }
 
+h1,
+h2 {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 480;
+}
+
 h1 {
-    font-size: clamp(34px, 7.4vw, 68px);
-    font-weight: 620;
-    max-width: 16ch;
+    font-size: clamp(40px, 8.2vw, 84px);
+    max-width: 15ch;
 }
 
 h2 {
-    font-size: clamp(26px, 4.4vw, 40px);
-    font-weight: 600;
-    max-width: 20ch;
+    font-size: clamp(28px, 4.8vw, 46px);
+    max-width: 22ch;
 }
 
 h3 {
@@ -309,8 +311,8 @@ button,
     font-size: 15px;
     font-weight: 550;
     letter-spacing: -0.01em;
-    border-radius: 10px;
-    padding: 13px 22px;
+    border-radius: 999px;
+    padding: 13px 26px;
     min-height: 46px;
     cursor: pointer;
     border: 1px solid transparent;
@@ -324,8 +326,8 @@ button,
         box-shadow 200ms var(--ease),
         background 160ms var(--ease),
         border-color 160ms var(--ease);
-    /* The primary action carries the brand gradient, and it is the only place that gradient appears. */
-    background: linear-gradient(135deg, var(--flare) 0%, var(--flare-warm) 100%);
+    /* The primary action is solid brand pink. One colour, no gradient, full confidence. */
+    background: var(--flare);
     color: #fff;
 }
 
@@ -466,12 +468,14 @@ button.wide {
     margin-bottom: 24px;
 }
 
-/* The clause the product turns on, lit in the brand gradient. */
+/* The clause the product turns on: italic, pink, serif. One gesture instead of a gradient. */
 .grad {
-    background: linear-gradient(100deg, var(--flare) 10%, var(--flare-warm) 90%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    font-style: italic;
+    font-weight: 440;
+    color: var(--flare);
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
 }
 
 .flarebadge {
@@ -564,9 +568,9 @@ button.wide {
 .card {
     position: relative;
     padding: 26px 24px;
-    border-radius: 16px;
+    border-radius: 18px;
     border: 1px solid var(--hairline);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+    background: var(--surface);
     transition:
         border-color 220ms var(--ease),
         transform 220ms var(--ease);
@@ -1556,10 +1560,7 @@ h3.sub {
 }
 
 /* Gradient headline — the brand wash slides through it once in a while, like light over foil. */
-.grad {
-    background-size: 220% 100%;
-    animation: gradSlide 7s ease-in-out infinite;
-}
+
 
 @keyframes gradSlide {
     0%, 72%, 100% { background-position: 0% 50%; }
@@ -1768,10 +1769,10 @@ h2::after {
 }
 
 .stats > * {
-    padding: 24px 22px;
-    border-radius: 16px;
+    padding: 26px 24px;
+    border-radius: 18px;
     border: 1px solid var(--hairline);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+    background: var(--surface);
     transition: transform 220ms var(--ease), border-color 220ms var(--ease);
 }
 
