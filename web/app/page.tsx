@@ -43,8 +43,8 @@ export default function Landing() {
                         <span className="brand-tag">prove revenue · borrow</span>
                     </Link>
                     <nav>
-                        <a href="#how">How it works</a>
-                        <a href="#proof">Evidence</a>
+                        <Link href="/docs">Docs</Link>
+                        <Link href="/security">Security</Link>
                         <a href={REPO} target="_blank" rel="noreferrer">
                             GitHub
                         </a>
@@ -345,6 +345,13 @@ export default function Landing() {
                             <a href={`${EXPLORER}/tx/0x8b32907ea847421be70bacd8e5754752236cbbf673afd7dfbec6568832ff0de5`} target="_blank" rel="noreferrer">Private underwriting</a>
                             <a href={`${XRPL}/transactions/10E4F29BC5608E5438964ECB3147D34600869D389186C612505678CEE4E70AD5`} target="_blank" rel="noreferrer">XRPL repayment</a>
                             <a href={`${REPO}/blob/main/scripts/ledgerline/verify-claims.ts`} target="_blank" rel="noreferrer">Verify every claim</a>
+                        </div>
+                        <div className="foot-col">
+                            <div className="foot-title">Site</div>
+                            <Link href="/docs">Docs</Link>
+                            <Link href="/security">Security</Link>
+                            <Link href="/confidential">Confidential</Link>
+                            <Link href="/app/lend">Lend</Link>
                         </div>
                         <div className="foot-col">
                             <div className="foot-title">Source</div>

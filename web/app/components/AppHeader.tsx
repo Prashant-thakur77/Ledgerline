@@ -15,6 +15,7 @@ const TABS = [
     { href: "/app", label: "Borrow" },
     { href: "/app/lend", label: "Lend" },
     { href: "/app/activity", label: "Activity" },
+    { href: "/app/account", label: "Account" },
 ];
 
 export function AppHeader({

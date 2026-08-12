@@ -1965,7 +1965,7 @@ h2::after {
 
 @media (min-width: 741px) {
     .sitefooter-grid {
-        grid-template-columns: 1.4fr 1fr 1fr 1fr;
+        grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr;
     }
 }
 
@@ -1995,4 +1995,43 @@ h2::after {
 .foot-brand p {
     font-size: 14px;
     max-width: 34ch;
+}
+
+
+/* ---------------------------------------------------------------- docs */
+
+/* The contents list: mono, ruled, and honest about being a list. */
+.toc {
+    display: grid;
+    gap: 0;
+    margin-top: 40px;
+    max-width: 420px;
+    border-top: 1px solid var(--hairline);
+}
+
+.toc a {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--ink-dim);
+    padding: 12px 2px;
+    border-bottom: 1px solid var(--hairline);
+    transition: color 160ms var(--ease), padding-left 160ms var(--ease);
+}
+
+.toc a:hover {
+    color: var(--ink);
+    padding-left: 10px;
+}
+
+/* Docs sections read as a document: generous top space, narrow measure. */
+.docspage h2 {
+    margin-bottom: 18px;
+}
+
+/* A lede directly after a page headline gets air; the hero manages its own spacing. */
+h1 + .lede {
+    margin-top: 26px;
 }

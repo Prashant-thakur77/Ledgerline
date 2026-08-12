@@ -49,6 +49,52 @@ export const oracleAbi = [
         inputs: [{ name: "accountId", type: "bytes32" }],
         outputs: [{ type: "address" }],
     },
+    {
+        type: "function",
+        name: "accountCreatedAt",
+        stateMutability: "view",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [{ type: "uint64" }],
+    },
+    /* Wallet rotation: a three-day public delay, cancellable by the owner the whole time. */
+    {
+        type: "function",
+        name: "pendingNewOwner",
+        stateMutability: "view",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [{ type: "address" }],
+    },
+    {
+        type: "function",
+        name: "rebindReadyAt",
+        stateMutability: "view",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [{ type: "uint64" }],
+    },
+    {
+        type: "function",
+        name: "requestRebind",
+        stateMutability: "nonpayable",
+        inputs: [
+            { name: "accountId", type: "bytes32" },
+            { name: "newOwner", type: "address" },
+        ],
+        outputs: [],
+    },
+    {
+        type: "function",
+        name: "cancelRebind",
+        stateMutability: "nonpayable",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [],
+    },
+    {
+        type: "function",
+        name: "finalizeRebind",
+        stateMutability: "nonpayable",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [],
+    },
 ] as const;
 
 export const managerAbi = [
