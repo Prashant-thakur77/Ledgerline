@@ -80,3 +80,43 @@ export function ScrollProgress() {
 export function Aurora() {
     return <div className="aurora" aria-hidden="true" />;
 }
+
+/** A card grid whose hover spotlight follows the cursor. One delegated handler, CSS does the rest. */
+export function CardGrid({ children }: { children: React.ReactNode }) {
+    return (
+        <div
+            className="cards"
+            onMouseMove={(e) => {
+                const card = (e.target as HTMLElement).closest?.(".card") as HTMLElement | null;
+                if (!card) return;
+                const r = card.getBoundingClientRect();
+                card.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
+                card.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+            }}
+        >
+            {children}
+        </div>
+    );
+}
+
+/** A headline whose words rise out of a clipped line, staggered left to right. */
+export function MaskedWords({ text, grad = "" }: { text: string; grad?: string }) {
+    const words = text.split(" ");
+    const gradWords = grad ? grad.split(" ") : [];
+    const gradStart = grad ? words.length - gradWords.length : words.length;
+    return (
+        <>
+            {words.map((w, i) => (
+                <span key={i} className="mask">
+                    <span
+                        className={`mask-in${i >= gradStart ? " grad" : ""}`}
+                        style={{ animationDelay: `${80 + i * 70}ms` }}
+                    >
+                        {w}
+                    </span>
+                    {i < words.length - 1 ? " " : ""}
+                </span>
+            ))}
+        </>
+    );
+}

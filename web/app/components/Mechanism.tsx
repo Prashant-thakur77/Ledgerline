@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 /**
  * How the number gets from a payment processor to a payout, in the order it actually happens.
  *
@@ -63,10 +65,37 @@ const STAGES: Stage[] = [
 ];
 
 export function Mechanism() {
+    const ref = useRef<HTMLOListElement>(null);
+    const [current, setCurrent] = useState(-1);
+
+    /*
+     * Scroll-telling: the step nearest the reader's centre wakes, the rest sleep. IntersectionObserver
+     * with a narrow band around the viewport middle, so exactly one step is "current" at a time.
+     */
+    useEffect(() => {
+        const root = ref.current;
+        if (!root) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            setCurrent(-2); // sentinel: everything stays fully visible
+            return;
+        }
+        const items = Array.from(root.querySelectorAll("li"));
+        const io = new IntersectionObserver(
+            (entries) => {
+                for (const e of entries) {
+                    if (e.isIntersecting) setCurrent(items.indexOf(e.target as HTMLLIElement));
+                }
+            },
+            { rootMargin: "-42% 0px -42% 0px", threshold: 0 }
+        );
+        items.forEach((li) => io.observe(li));
+        return () => io.disconnect();
+    }, []);
+
     return (
-        <ol className="mechanism">
-            {STAGES.map((s) => (
-                <li key={s.title} className={s.attested ? "attested" : undefined}>
+        <ol className="mechanism" ref={ref}>
+            {STAGES.map((s, i) => (
+                <li key={s.title} className={[s.attested ? "attested" : "", current === -2 || current === i ? "current" : ""].filter(Boolean).join(" ") || undefined}>
                     <span className="node" aria-hidden="true">
                         {s.attested ? "✓" : "•"}
                     </span>

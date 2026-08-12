@@ -1702,3 +1702,164 @@ h2::after {
         display: inline;
     }
 }
+
+/* ---------------------------------------------------------------- motion layer III */
+
+/* Headline words rise out of a clipped line, staggered: the masked-reveal entrance. */
+.mask {
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: bottom;
+    padding-bottom: 0.08em;
+    margin-bottom: -0.08em;
+}
+
+.mask-in {
+    display: inline-block;
+    transform: translateY(115%);
+    animation: maskUp 0.8s var(--ease) forwards;
+}
+
+@keyframes maskUp {
+    to { transform: translateY(0); }
+}
+
+/* Entrances sharpen as they arrive: blur-up layered onto the existing reveal. */
+.reveal {
+    filter: blur(10px);
+    transition:
+        opacity 700ms var(--ease),
+        transform 700ms var(--ease),
+        filter 700ms var(--ease);
+}
+
+.reveal.in {
+    filter: blur(0);
+}
+
+/* Cards become glass under a cursor spotlight: the highlight sits where the pointer is. */
+.card {
+    overflow: hidden;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 300ms var(--ease);
+    background: radial-gradient(
+        22rem 16rem at var(--mx, 50%) var(--my, 0%),
+        rgba(230, 32, 88, 0.1),
+        transparent 60%
+    );
+    pointer-events: none;
+}
+
+.card:hover::after {
+    opacity: 1;
+}
+
+/* The stats become a bento band: glass cells, the headline figure holding double width. */
+.stats {
+    gap: 14px;
+}
+
+.stats > * {
+    padding: 24px 22px;
+    border-radius: 16px;
+    border: 1px solid var(--hairline);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+    transition: transform 220ms var(--ease), border-color 220ms var(--ease);
+}
+
+.stats > *:hover {
+    transform: translateY(-3px);
+    border-color: rgba(230, 32, 88, 0.35);
+}
+
+@media (min-width: 741px) {
+    .stats {
+        grid-template-columns: repeat(6, 1fr);
+    }
+
+    .stats > * {
+        grid-column: span 1;
+    }
+
+    .stats > :first-child {
+        grid-column: span 3;
+        background:
+            radial-gradient(30rem 16rem at 8% 0%, rgba(230, 32, 88, 0.09), transparent 60%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012));
+    }
+
+    .stats > :first-child .stat-value {
+        font-size: clamp(40px, 5.6vw, 58px);
+    }
+}
+
+/* Scroll-telling: the mechanism steps sleep until the reader reaches them. */
+.mechanism li {
+    opacity: 0.45;
+    transition: opacity 400ms var(--ease), transform 400ms var(--ease);
+}
+
+.mechanism li.current {
+    opacity: 1;
+    transform: translateX(4px);
+}
+
+.mechanism li.current .node {
+    color: var(--flare);
+    text-shadow: 0 0 14px var(--flare-glow);
+}
+
+.mechanism li.current.attested .node {
+    color: var(--proof);
+    text-shadow: 0 0 14px var(--proof-wash);
+}
+
+/* A proper footer: the four-column close every serious product page ends on. */
+.sitefooter-grid {
+    display: grid;
+    gap: 32px;
+    grid-template-columns: 1fr;
+    padding: 44px 0 20px;
+}
+
+@media (min-width: 741px) {
+    .sitefooter-grid {
+        grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    }
+}
+
+.foot-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+}
+
+.foot-col a {
+    display: block;
+    color: var(--ink-dim);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 4px 0;
+    transition: color 160ms var(--ease), transform 160ms var(--ease);
+}
+
+.foot-col a:hover {
+    color: var(--ink);
+    transform: translateX(3px);
+}
+
+.foot-brand p {
+    font-size: 14px;
+    max-width: 34ch;
+}

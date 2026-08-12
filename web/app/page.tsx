@@ -6,7 +6,7 @@ import { Tilt } from "./components/Tilt";
 import { ParticleField } from "./components/ParticleField";
 import { Reveal } from "./components/Reveal";
 import { Stat } from "./components/Stat";
-import { FlareBadge, Marquee, Grain, ScrollProgress, Aurora } from "./components/Chrome";
+import { FlareBadge, Marquee, Grain, ScrollProgress, Aurora, CardGrid, MaskedWords } from "./components/Chrome";
 
 export const metadata: Metadata = {
     title: "Proofline · Prove revenue. Borrow.",
@@ -64,7 +64,7 @@ export default function Landing() {
                         </Reveal>
                         <Reveal delay={70}>
                             <h1 style={{ marginTop: 26 }}>
-                                Borrow against revenue <span className="grad">you can prove</span>.
+                                <MaskedWords text="Borrow against revenue you can prove." grad="you can prove." />
                             </h1>
                         </Reveal>
                         <Reveal delay={140}>
@@ -141,7 +141,7 @@ export default function Landing() {
                             <p className="eyebrow">The gap</p>
                             <h2>Why this cannot be built without Flare</h2>
                         </Reveal>
-                        <div className="cards">
+                        <CardGrid>
                             {[
                                 {
                                     n: "01",
@@ -165,7 +165,7 @@ export default function Landing() {
                                     <p>{c.p}</p>
                                 </Reveal>
                             ))}
-                        </div>
+                        </CardGrid>
                     </div>
                 </section>
 
@@ -268,7 +268,7 @@ export default function Landing() {
                             <p className="eyebrow">Limitations</p>
                             <h2>What is honest about it</h2>
                         </Reveal>
-                        <div className="cards">
+                        <CardGrid>
                             {[
                                 {
                                     h: "This is unsecured credit",
@@ -288,7 +288,7 @@ export default function Landing() {
                                     <p>{c.p}</p>
                                 </Reveal>
                             ))}
-                        </div>
+                        </CardGrid>
                         <Reveal delay={200}>
                             <p className="quiet narrow" style={{ marginTop: 32 }}>
                                 No users yet, and it would be dishonest to imply otherwise. The sandbox source
@@ -323,19 +323,33 @@ export default function Landing() {
                 </section>
 
                 <footer className="sitefooter">
-                    <div className="shell sitefooter-in">
-                        <FlareBadge compact />
-                        <div className="footlinks">
-                            <a href={`${EXPLORER}/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code`} target="_blank" rel="noreferrer">
-                                RevenueOracle
-                            </a>
-                            <a href={`${EXPLORER}/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code`} target="_blank" rel="noreferrer">
-                                AdvanceManager
-                            </a>
-                            <a href={REPO} target="_blank" rel="noreferrer">
-                                GitHub
-                            </a>
-                            <span className="quiet">Coston2 · chain 114 · MIT</span>
+                    <div className="shell sitefooter-grid">
+                        <div className="foot-brand">
+                            <FlareBadge compact />
+                            <p className="quiet" style={{ marginTop: 16 }}>
+                                Proofline. Prove your revenue on chain, borrow against it, and let the
+                                revenue repay it. Coston2 testnet, chain 114. MIT licensed.
+                            </p>
+                        </div>
+                        <div className="foot-col">
+                            <div className="foot-title">Contracts</div>
+                            <a href={`${EXPLORER}/address/0x151FDDB3d60B1Cc9AD43e0831495D430b0412906#code`} target="_blank" rel="noreferrer">RevenueOracle</a>
+                            <a href={`${EXPLORER}/address/0xae027AeB3d1FBa24743D1ADE902521641F32f41c#code`} target="_blank" rel="noreferrer">AdvanceManager</a>
+                            <a href={`${EXPLORER}/address/0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7#code`} target="_blank" rel="noreferrer">LenderPool</a>
+                            <a href={`${EXPLORER}/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code`} target="_blank" rel="noreferrer">PrivateUnderwriter</a>
+                        </div>
+                        <div className="foot-col">
+                            <div className="foot-title">Evidence</div>
+                            <a href={`${EXPLORER}/tx/0x8b32907ea847421be70bacd8e5754752236cbbf673afd7dfbec6568832ff0de5`} target="_blank" rel="noreferrer">Private underwriting</a>
+                            <a href={`${XRPL}/transactions/10E4F29BC5608E5438964ECB3147D34600869D389186C612505678CEE4E70AD5`} target="_blank" rel="noreferrer">XRPL repayment</a>
+                            <a href={`${REPO}/blob/main/scripts/ledgerline/verify-claims.ts`} target="_blank" rel="noreferrer">Verify every claim</a>
+                        </div>
+                        <div className="foot-col">
+                            <div className="foot-title">Source</div>
+                            <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
+                            <a href={`${REPO}/blob/main/README.md`} target="_blank" rel="noreferrer">README</a>
+                            <a href={`${REPO}/blob/main/docs/ROADMAP.md`} target="_blank" rel="noreferrer">Roadmap</a>
+                            <a href={`${REPO}/blob/main/docs/RESOLUTIONS.md`} target="_blank" rel="noreferrer">Security model</a>
                         </div>
                     </div>
                 </footer>
