@@ -1682,3 +1682,23 @@ h2::after {
 .cards .card:hover {
     transform: translateY(-4px) perspective(700px) rotateX(1.6deg);
 }
+
+/* The whisper after the wordmark: what we do, in three words, hidden where space is tight. */
+.brand-tag {
+    display: none;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 450;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 1px solid var(--hairline-firm);
+}
+
+@media (min-width: 721px) {
+    .brand-tag {
+        display: inline;
+    }
+}

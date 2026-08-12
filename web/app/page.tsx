@@ -9,9 +9,9 @@ import { Stat } from "./components/Stat";
 import { FlareBadge, Marquee, Grain, ScrollProgress, Aurora } from "./components/Chrome";
 
 export const metadata: Metadata = {
-    title: "Ledgerline: borrow against revenue you can prove",
+    title: "Ledgerline · Prove revenue. Borrow.",
     description:
-        "Your payment processor already proves you earn four thousand dollars a month. No lender can read it, and Flare's Data Connector can. Advances against attested revenue, settled in FXRP or real XRP.",
+        "Prove your revenue on chain. Borrow against it. Your revenue repays it. Built on Flare.",
 };
 
 const EXPLORER = "https://coston2-explorer.flare.network";
@@ -38,6 +38,7 @@ export default function Landing() {
                 <div className="siteheader-in">
                     <Link href="/" className="brand">
                         Ledgerline
+                        <span className="brand-tag">prove revenue · borrow</span>
                     </Link>
                     <nav>
                         <a href="#how">How it works</a>

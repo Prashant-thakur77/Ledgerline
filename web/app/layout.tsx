@@ -7,7 +7,7 @@ const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display:
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
-    title: "Ledgerline — advances against proven revenue",
+    title: "Ledgerline · Prove revenue. Borrow.",
     description: "Borrow against revenue your payment processor already proves, settled in FXRP on Flare.",
 };
 
