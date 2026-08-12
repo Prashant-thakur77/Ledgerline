@@ -4,8 +4,36 @@ import Image from "next/image";
 import { useEffect } from "react";
 
 /**
- * Small shared furniture: the Flare attribution, the protocol ticker, and the grain overlay.
+ * Small shared furniture: the mark, the Flare attribution, the protocol ticker, and the grain overlay.
  */
+
+/**
+ * The Proofline mark: a line that resolves into a check and continues at a higher level.
+ *
+ * Read left to right it is the product — revenue running flat, the moment it is proven, and the borrowing
+ * power that exists afterwards because of it. One stroke, so it survives at favicon size, and monochrome,
+ * so it obeys the same palette as everything else.
+ */
+export function Mark({ size = 22 }: { size?: number }) {
+    return (
+        <svg
+            width={size}
+            height={(size * 32) / 48}
+            viewBox="0 0 48 32"
+            fill="none"
+            aria-hidden="true"
+            className="mark"
+        >
+            <path
+                d="M2 22 L14 22 L20 28 L31 9 L46 9"
+                stroke="currentColor"
+                strokeWidth="3.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+}
 
 /**
  * "Built on Flare", using Flare's own logo.

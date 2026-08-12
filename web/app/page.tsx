@@ -3,11 +3,11 @@ import type { Metadata } from "next";
 import { Mechanism } from "./components/Mechanism";
 import { LiveProof } from "./components/LiveProof";
 import { Tilt } from "./components/Tilt";
-import { PulseLine } from "./components/PulseLine";
+import { RevenueLine } from "./components/RevenueLine";
 import { HeroStrip } from "./components/HeroStrip";
 import { Reveal } from "./components/Reveal";
 import { Stat } from "./components/Stat";
-import { FlareBadge, Marquee, Grain, ScrollProgress, CardGrid, MaskedWords } from "./components/Chrome";
+import { FlareBadge, Mark, Marquee, Grain, ScrollProgress, CardGrid, MaskedWords } from "./components/Chrome";
 
 export const metadata: Metadata = {
     title: "Proofline · Prove revenue. Borrow.",
@@ -38,6 +38,7 @@ export default function Landing() {
             <header className="siteheader">
                 <div className="siteheader-in">
                     <Link href="/" className="brand">
+                        <Mark />
                         Proofline
                         <span className="brand-tag">prove revenue · borrow</span>
                     </Link>
@@ -57,7 +58,7 @@ export default function Landing() {
             <main className="landing">
                 {/* ---------------------------------------------------------------- hero */}
                 <section className="hero">
-                    <PulseLine />
+                    <RevenueLine />
                     <div className="shell hero-in">
                         <Reveal>
                             <p className="eyebrow">Flare Summer Signal — live on Coston2</p>

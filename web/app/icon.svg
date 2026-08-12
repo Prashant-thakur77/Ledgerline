@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- The Proofline mark at favicon size: a line proven into a check, continuing higher. -->
+  <rect width="32" height="32" fill="#000000"/>
+  <path d="M3 20 L10.5 20 L14.5 24 L21.5 12 L29 12"
+        stroke="#ffffff" stroke-width="3" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

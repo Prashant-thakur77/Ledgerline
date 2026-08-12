@@ -281,15 +281,10 @@ code {
     color: var(--ink);
 }
 
-/* The spark beside the wordmark, in Flare's pink. */
-.brand::before {
-    content: "";
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--flare);
-    box-shadow: 0 0 12px var(--flare-glow);
+/* The mark leads the wordmark; it inherits the ink colour and needs nothing else. */
+.brand .mark {
     flex: none;
+    display: block;
 }
 
 .siteheader nav {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Mark } from "./Chrome";
 
 /**
  * The bar across the top of the application.
@@ -19,6 +20,7 @@ export function AppHeader({
         <header className="appheader">
             <div className="appheader-in">
                 <Link href="/" className="brand">
+                    <Mark />
                     Proofline
                 </Link>
                 <div className="appheader-right">
