@@ -38,8 +38,22 @@ export function ParticleField() {
         const LINK = window.innerWidth < 720 ? 110 : 140;
         const LINK_SQ = LINK * LINK;
 
-        type P = { x: number; y: number; vx: number; vy: number; r: number };
-        let points: P[] = [];
+        /*
+         * A genuinely three-dimensional cloud: points live in model space on a loose spherical shell,
+         * the whole cloud turns slowly, and a perspective divide projects them to the screen. Depth is
+         * legible three ways — nearer points are larger, brighter, and their links stronger — which is
+         * what makes it read as a rotating constellation rather than drifting dots.
+         */
+        type P3 = { x: number; y: number; z: number; r: number };
+        let points: P3[] = [];
+        let angleY = 0;
+        let angleX = 0.35;
+        // The pointer steers the rotation a little: attention tilts the cloud.
+        let targetTilt = 0;
+        let tilt = 0;
+
+        const FOCAL = 720;
+        const RADIUS = 340;
 
         function resize() {
             if (!canvas) return;
@@ -52,49 +66,71 @@ export function ParticleField() {
         }
 
         function seed() {
-            points = Array.from({ length: COUNT }, () => ({
-                x: Math.random() * width,
-                y: Math.random() * height,
-                vx: (Math.random() - 0.5) * 0.22,
-                vy: (Math.random() - 0.5) * 0.22,
-                r: Math.random() * 1.6 + 0.7,
-            }));
+            points = Array.from({ length: COUNT }, () => {
+                // A shell with jitter, not a solid ball: constellations live on the sky, not in it.
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const rr = RADIUS * (0.72 + Math.random() * 0.4);
+                return {
+                    x: rr * Math.sin(phi) * Math.cos(theta),
+                    y: rr * Math.cos(phi) * 0.7,
+                    z: rr * Math.sin(phi) * Math.sin(theta),
+                    r: Math.random() * 1.5 + 0.6,
+                };
+            });
         }
+
+        const onPointer = (e: PointerEvent) => {
+            targetTilt = (e.clientX / window.innerWidth - 0.5) * 0.5;
+        };
+        window.addEventListener("pointermove", onPointer, { passive: true });
 
         function frame() {
             if (!running) return;
             ctx!.clearRect(0, 0, width, height);
 
+            angleY += 0.0016;
+            tilt += (targetTilt - tilt) * 0.03;
+            const cy = Math.cos(angleY + tilt), sy = Math.sin(angleY + tilt);
+            const cx = Math.cos(angleX), sx = Math.sin(angleX);
+
+            const cxPix = width * 0.62; // the cloud sits off-centre, behind the copy's right shoulder
+            const cyPix = height * 0.44;
+
+            // Rotate and project once per frame; reuse for both passes.
+            const proj: { X: number; Y: number; s: number; p: P3 }[] = [];
             for (const p of points) {
-                p.x += p.vx;
-                p.y += p.vy;
-                // Wrap rather than bounce: bouncing makes the edges look like walls.
-                if (p.x < -20) p.x = width + 20;
-                if (p.x > width + 20) p.x = -20;
-                if (p.y < -20) p.y = height + 20;
-                if (p.y > height + 20) p.y = -20;
+                const x1 = p.x * cy - p.z * sy;
+                const z1 = p.x * sy + p.z * cy;
+                const y1 = p.y * cx - z1 * sx;
+                const z2 = p.y * sx + z1 * cx;
+                const s = FOCAL / (FOCAL + z2 + RADIUS); // 0.35..1.35 depth scale
+                proj.push({ X: cxPix + x1 * s, Y: cyPix + y1 * s, s, p });
             }
 
-            for (let i = 0; i < points.length; i++) {
-                for (let j = i + 1; j < points.length; j++) {
-                    const dx = points[i].x - points[j].x;
-                    const dy = points[i].y - points[j].y;
+            for (let i = 0; i < proj.length; i++) {
+                for (let j = i + 1; j < proj.length; j++) {
+                    const dx = proj[i].X - proj[j].X;
+                    const dy = proj[i].Y - proj[j].Y;
                     const d2 = dx * dx + dy * dy;
                     if (d2 > LINK_SQ) continue;
-                    const alpha = (1 - d2 / LINK_SQ) * 0.5;
+                    const depth = (proj[i].s + proj[j].s) / 2;
+                    const alpha = (1 - d2 / LINK_SQ) * 0.42 * depth;
                     ctx!.strokeStyle = `rgba(230, 32, 88, ${alpha})`;
-                    ctx!.lineWidth = 0.7;
+                    ctx!.lineWidth = 0.7 * depth;
                     ctx!.beginPath();
-                    ctx!.moveTo(points[i].x, points[i].y);
-                    ctx!.lineTo(points[j].x, points[j].y);
+                    ctx!.moveTo(proj[i].X, proj[i].Y);
+                    ctx!.lineTo(proj[j].X, proj[j].Y);
                     ctx!.stroke();
                 }
             }
 
-            for (const p of points) {
-                ctx!.fillStyle = "rgba(242, 240, 236, 0.55)";
+            for (const q of proj) {
+                // Far points cool toward the violet field; near ones warm toward ink.
+                const a = 0.18 + 0.45 * (q.s - 0.35);
+                ctx!.fillStyle = q.s > 0.95 ? `rgba(244, 242, 238, ${a})` : `rgba(170, 150, 255, ${a})`;
                 ctx!.beginPath();
-                ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx!.arc(q.X, q.Y, q.p.r * q.s, 0, Math.PI * 2);
                 ctx!.fill();
             }
 
@@ -133,6 +169,7 @@ export function ParticleField() {
             running = false;
             cancelAnimationFrame(raf);
             window.removeEventListener("resize", onResize);
+            window.removeEventListener("pointermove", onPointer);
             document.removeEventListener("visibilitychange", onVisibility);
             io.disconnect();
         };

@@ -13,12 +13,13 @@
  */
 
 :root {
-    /* ground */
-    --ground: #08080b;
-    --surface: #0e0e13;
-    --raised: #15151c;
-    --hairline: rgba(255, 255, 255, 0.09);
-    --hairline-firm: rgba(255, 255, 255, 0.16);
+    /* ground — deep space with an indigo undertone, not flat black */
+    --ground: #070510;
+    --ground-deep: #0b0718;
+    --surface: #100b1e;
+    --raised: #171129;
+    --hairline: rgba(190, 170, 255, 0.10);
+    --hairline-firm: rgba(190, 170, 255, 0.18);
 
     /* ink */
     --ink: #f4f2ee;
@@ -28,7 +29,9 @@
     /* brand — Flare's pink, and the warm end of their gradient */
     --flare: #e62058;
     --flare-warm: #ff7a45;
+    --violet: #7c5cff;
     --flare-glow: rgba(230, 32, 88, 0.5);
+    --violet-glow: rgba(124, 92, 255, 0.35);
 
     /* the one semantic colour */
     --proof: #3ddc97;
@@ -75,10 +78,13 @@ body {
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     overflow-wrap: break-word;
-    /* A slow wash of colour behind everything, so the page is never flat black. */
+    /* A slow wash of colour behind everything, so the page is never flat black: pink at the crown,
+       violet mid-field, the warm ember low — depth reads as three light sources, not a gradient. */
     background-image:
-        radial-gradient(60rem 40rem at 12% -8%, rgba(230, 32, 88, 0.13), transparent 60%),
-        radial-gradient(48rem 34rem at 92% 4%, rgba(255, 122, 69, 0.08), transparent 62%);
+        radial-gradient(60rem 40rem at 12% -8%, rgba(230, 32, 88, 0.14), transparent 60%),
+        radial-gradient(70rem 50rem at 78% 30%, rgba(124, 92, 255, 0.10), transparent 65%),
+        radial-gradient(48rem 34rem at 8% 88%, rgba(255, 122, 69, 0.07), transparent 62%),
+        linear-gradient(180deg, var(--ground-deep) 0%, var(--ground) 42%, #050310 100%);
     background-attachment: fixed;
 }
 
@@ -1650,4 +1656,29 @@ h2::after {
 .evidence li:hover {
     transform: translateX(4px);
     background: rgba(255, 255, 255, 0.02);
+}
+
+/* The tilt wrapper: transform lives here; the glare rides a CSS var the tracker sets. */
+.tilt {
+    transform-style: preserve-3d;
+    will-change: transform;
+    position: relative;
+}
+
+.tilt > .proofcard::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+        34rem 22rem at var(--glare-x, 50%) var(--glare-y, 50%),
+        rgba(255, 255, 255, 0.06),
+        transparent 55%
+    );
+    pointer-events: none;
+}
+
+/* The problem cards get a hint of the same depth on hover, statically. */
+.cards .card:hover {
+    transform: translateY(-4px) perspective(700px) rotateX(1.6deg);
 }

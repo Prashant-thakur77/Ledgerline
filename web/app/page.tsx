@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Mechanism } from "./components/Mechanism";
 import { LiveProof } from "./components/LiveProof";
+import { Tilt } from "./components/Tilt";
 import { ParticleField } from "./components/ParticleField";
 import { Reveal } from "./components/Reveal";
 import { Stat } from "./components/Stat";
@@ -108,7 +109,9 @@ export default function Landing() {
                             <h2>Not a mock. Read from Coston2, right now.</h2>
                         </Reveal>
                         <Reveal delay={80}>
-                            <LiveProof />
+                            <Tilt>
+                                <LiveProof />
+                            </Tilt>
                         </Reveal>
                         <Reveal delay={140}>
                             <p className="narrow" style={{ marginTop: 26 }}>
