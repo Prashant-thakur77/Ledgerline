@@ -70,6 +70,18 @@ contract HelloWorldInstructionSender {
         revert("Extension ID not found.");
     }
 
+    /// @notice Sets the extension id explicitly, verified against the registry. Public ids now start far
+    /// above FIRST_PUBLIC_EXTENSION_ID, so the scan above can exceed the block gas limit; this performs
+    /// the same binding in O(1), and the registry check keeps it exactly as trustless as the scan.
+    function setExtensionIdExplicit(uint256 _id) external {
+        require(_extensionId == 0, "Extension ID already set.");
+        require(
+            TEE_EXTENSION_REGISTRY.getTeeExtensionInstructionsSender(_id) == address(this),
+            "Extension ID does not map to this contract."
+        );
+        _extensionId = _id;
+    }
+
     /// @notice Sends a SAY_HELLO instruction to the TEE.
     /// @param _message JSON-encoded payload (e.g. {"name": "Alice"}).
     function sendSayHello(bytes calldata _message) external payable {
