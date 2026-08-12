@@ -107,6 +107,15 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     mapping(bytes32 => uint256) public fxrpRetired;
 
     /**
+     * @notice Dollars received beyond what was owed — an XRPL payment cannot be retracted or refunded
+     * without custodying an XRPL hot key, so the excess becomes credit and settles the next advance.
+     */
+    mapping(bytes32 => uint256) public creditCents;
+
+    /// @notice Optional: the only XRPL sender (as a standard address hash) allowed to repay this account.
+    mapping(bytes32 => bytes32) public boundRepaymentSource;
+
+    /**
      * @notice The chain an XRPL repayment must have happened on, as an FDC source id.
      * `bytes32("testXRP")` on Coston2, `bytes32("XRP")` in production. Pinning it stops a payment on one
      * chain being replayed as proof of a payment on another.
@@ -167,6 +176,9 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     event PoolSet(address pool);
     /// @notice The unrecovered remainder of a delinquent advance, formally taken as the pool's loss.
     event WrittenOff(bytes32 indexed accountId, uint256 outstandingCents, uint256 fxrpWrittenOff);
+    event CreditAccrued(bytes32 indexed accountId, uint256 usdCents, uint256 totalCreditCents);
+    event CreditApplied(bytes32 indexed accountId, uint256 usdCents, uint256 outstandingCents);
+    event RepaymentSourceBound(bytes32 indexed accountId, bytes32 xrplSenderHash);
     event XrplTreasurySet(string xrplAddress, bytes32 xrplAddressHash, bytes32 sourceId);
     /// @notice A repayment that arrived as real XRP on the XRP Ledger and was proven by FDC.
     event RepaidFromXrpl(
@@ -197,6 +209,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     error PoolAlreadyActive();
     error NotDelinquent();
     error InvalidPaymentProof();
+    error WrongPaymentSender(bytes32 expected, bytes32 got);
     error WrongPaymentChain(bytes32 expected, bytes32 got);
     error PaymentNotSuccessful(uint8 status);
     error WrongPaymentRecipient();
@@ -357,6 +370,8 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         advance.factorBps = accountFactorBps(accountId);
         advance.xrpUsdPrice = price;
         advance.priceDecimals = priceDecimals;
+        // A new advance starts its retirement ledger fresh; the old advance's is fully consumed by close.
+        fxrpRetired[accountId] = 0;
 
         emit Underwritten(accountId, avg, periodsUsed, advance.factorBps, limit);
         emit AdvanceIssued(
@@ -368,6 +383,34 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             advance.xrpUsdPrice,
             advance.priceDecimals
         );
+
+        _applyCredit(accountId, advance);
+    }
+
+    /**
+     * @dev Banked credit from earlier XRPL overpayments settles the new debt immediately. If it covers the
+     * whole obligation the advance opens already closed — the borrower has effectively converted old
+     * overpaid XRP into fresh FXRP — but it deliberately does NOT count as a clean cycle: cycles are
+     * earned by repaying, and letting credit close them would let five micro-advances farm the tier cap
+     * for the price of the fees.
+     */
+    function _applyCredit(bytes32 accountId, Advance storage advance) internal {
+        uint256 credit = creditCents[accountId];
+        if (credit == 0) return;
+
+        uint256 applied = credit > advance.outstandingCents ? advance.outstandingCents : credit;
+        creditCents[accountId] = credit - applied;
+        advance.outstandingCents -= applied;
+        emit CreditApplied(accountId, applied, advance.outstandingCents);
+
+        if (advance.outstandingCents == 0) {
+            advance.open = false;
+            if (address(pool) != address(0)) {
+                uint256 retired = _retire(accountId, advance, applied, true);
+                pool.onRepayment(0, retired);
+            }
+            emit AdvanceClosed(accountId);
+        }
     }
 
     /// @notice Repay a dollar amount by hand, priced in FXRP at the current rate.
@@ -477,10 +520,70 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
      * cheap field comparisons run first and the expensive FDC verification runs last.
      */
     function repayFromXrpl(bytes32 accountId, IPayment.Proof calldata proof) external nonReentrant {
-        if (xrplTreasuryAddressHash == bytes32(0)) revert XrplRepaymentUnavailable();
+        _repayFromXrplOne(accountId, proof);
+    }
 
-        Advance storage advance = _advances[accountId];
-        if (!advance.open) revert NoOpenAdvance();
+    /**
+     * @notice Settle several XRPL payments against one account in a single transaction.
+     * @dev Each payment needs its own FDC attestation — that fee is per request and cannot be amortised —
+     * but the gas and the ceremony can be, which is what makes small, frequent repayments economic. If the
+     * debt closes mid-batch, the remaining payments land as credit rather than reverting the whole batch.
+     */
+    function repayFromXrplBatch(bytes32 accountId, IPayment.Proof[] calldata proofs) external nonReentrant {
+        if (proofs.length == 0) revert InvalidAmount();
+        for (uint256 i = 0; i < proofs.length; i++) {
+            _repayFromXrplOne(accountId, proofs[i]);
+        }
+    }
+
+    /**
+     * @notice Restrict repayments to one XRPL sender, or lift the restriction with an empty string.
+     *
+     * Unset, anyone may settle the account's debt — deliberate, a third party paying on a borrower's
+     * behalf is a feature. Set, a payment from anywhere else is rejected even with the right reference,
+     * which is the borrower's protection against a stranger's mistaken payment binding to their history.
+     */
+    function bindRepaymentSource(bytes32 accountId, string calldata xrplAddress) external {
+        address owner_ = oracle.accountOwner(accountId);
+        if (owner_ != msg.sender) revert NotAccountOwner(owner_, msg.sender);
+
+        bytes32 senderHash = bytes(xrplAddress).length == 0 ? bytes32(0) : keccak256(bytes(xrplAddress));
+        boundRepaymentSource[accountId] = senderHash;
+        emit RepaymentSourceBound(accountId, senderHash);
+    }
+
+    function _repayFromXrplOne(bytes32 accountId, IPayment.Proof calldata proof) internal {
+        uint256 drops = _validateXrplPayment(accountId, proof);
+
+        (uint256 price, int8 priceDecimals) = _xrpUsd();
+        if (price == 0) revert InvalidPrice();
+
+        uint256 usdValue = xrpDropsToUsdCents(drops, price, priceDecimals);
+        if (usdValue == 0) revert InvalidAmount();
+
+        /*
+         * Debt first, credit after. An XRPL payment cannot be retracted, so every attested dollar is
+         * honoured: what the open advance can absorb settles it, and the remainder becomes credit that
+         * the next advance consumes at origination.
+         */
+        uint256 toDebt = _settleXrplDebt(
+            accountId, proof.data.requestBody.transactionId, drops, usdValue, price, priceDecimals
+        );
+
+        uint256 toCredit = usdValue - toDebt;
+        if (toCredit > 0) {
+            creditCents[accountId] += toCredit;
+            emit CreditAccrued(accountId, toCredit, creditCents[accountId]);
+        }
+    }
+
+    /// @dev Every field that ties the payment to this chain, this treasury, this account and (when bound)
+    /// this sender — cheap checks first, the FDC proof last. Marks the replay guard on success.
+    function _validateXrplPayment(
+        bytes32 accountId,
+        IPayment.Proof calldata proof
+    ) internal returns (uint256 drops) {
+        if (xrplTreasuryAddressHash == bytes32(0)) revert XrplRepaymentUnavailable();
 
         IPayment.ResponseBody calldata body = proof.data.responseBody;
 
@@ -490,6 +593,10 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         if (body.standardPaymentReference != accountId) {
             revert WrongPaymentReference(accountId, body.standardPaymentReference);
         }
+        bytes32 bound = boundRepaymentSource[accountId];
+        if (bound != bytes32(0) && body.sourceAddressHash != bound) {
+            revert WrongPaymentSender(bound, body.sourceAddressHash);
+        }
 
         bytes32 transactionId = proof.data.requestBody.transactionId;
         if (xrplPaymentUsed[transactionId]) revert XrplPaymentAlreadyUsed(transactionId);
@@ -497,19 +604,24 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
 
         if (!_verifyPayment(proof)) revert InvalidPaymentProof();
 
-        (uint256 price, int8 priceDecimals) = _xrpUsd();
-        if (price == 0) revert InvalidPrice();
-
-        uint256 drops = uint256(body.receivedAmount);
-        uint256 usdCents = xrpDropsToUsdCents(drops, price, priceDecimals);
-        if (usdCents == 0) revert InvalidAmount();
-
-        // Overpaying closes the advance rather than reverting. A borrower cannot retract an XRPL payment,
-        // so rejecting it here would take their money and leave the debt standing.
-        if (usdCents > advance.outstandingCents) usdCents = advance.outstandingCents;
-
         xrplPaymentUsed[transactionId] = true;
-        advance.outstandingCents -= usdCents;
+        return uint256(body.receivedAmount);
+    }
+
+    /// @dev Apply an attested dollar value to the open advance, if any. Returns what the debt absorbed.
+    function _settleXrplDebt(
+        bytes32 accountId,
+        bytes32 transactionId,
+        uint256 drops,
+        uint256 usdValue,
+        uint256 price,
+        int8 priceDecimals
+    ) internal returns (uint256 toDebt) {
+        Advance storage advance = _advances[accountId];
+        if (!advance.open) return 0;
+
+        toDebt = usdValue > advance.outstandingCents ? advance.outstandingCents : usdValue;
+        advance.outstandingCents -= toDebt;
         advance.lastActivityAt = uint64(block.timestamp);
 
         bool closed = advance.outstandingCents == 0;
@@ -520,19 +632,16 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         }
 
         /*
-         * Deliberately no FXRP inflow recorded. The XRP landed in an XRP Ledger account, not as FXRP on
-         * Flare, so claiming a balance grew here would put a number in storage that nothing backs. With a
-         * pool attached the retired principal is booked with zero inflow — the share price visibly dips
-         * until the operator re-mints that XRP through FAssets and returns it with a plain transfer, which
-         * is disclosed in the pool's own documentation rather than smoothed over.
+         * Deliberately no FXRP inflow recorded: the XRP landed on the XRP Ledger, not here. With a pool
+         * attached, the retired principal books with zero inflow — the share price visibly dips until the
+         * operator re-mints that XRP through FAssets and returns it by plain transfer.
          */
         if (address(pool) != address(0)) {
-            uint256 retired = _retire(accountId, advance, usdCents, closed);
+            uint256 retired = _retire(accountId, advance, toDebt, closed);
             pool.onRepayment(0, retired);
         }
-        emit RepaidFromXrpl(
-            accountId, transactionId, drops, usdCents, price, priceDecimals, advance.outstandingCents
-        );
+
+        emit RepaidFromXrpl(accountId, transactionId, drops, toDebt, price, priceDecimals, advance.outstandingCents);
         if (closed) emit AdvanceClosed(accountId);
     }
 

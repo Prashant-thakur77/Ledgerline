@@ -282,15 +282,21 @@ describe("Repaying from the XRP Ledger", () => {
             ).to.be.revertedWithCustomError(manager, "InvalidPaymentProof");
         });
 
-        it("refuses when there is no advance to settle", async () => {
+        /*
+         * Deliberately changed in phase 5: a payment with nothing open to settle used to revert, which
+         * would have taken irretrievable XRP and given nothing back. It now lands as credit in full.
+         */
+        it("banks a payment as credit when there is no advance to settle", async () => {
             const { manager, borrower, accountId } = await setup();
             await manager.connect(borrower).repayFromXrpl(accountId, paymentProof(20n * DROPS_PER_XRP, accountId));
+            const creditAfterClose = await manager.creditCents(accountId);
 
-            await expect(
-                manager
-                    .connect(borrower)
-                    .repayFromXrpl(accountId, paymentProof(5n * DROPS_PER_XRP, accountId, { transactionId: ethers.id("xrpl-tx-2") }))
-            ).to.be.revertedWithCustomError(manager, "NoOpenAdvance");
+            await manager
+                .connect(borrower)
+                .repayFromXrpl(accountId, paymentProof(5n * DROPS_PER_XRP, accountId, { transactionId: ethers.id("xrpl-tx-2") }));
+
+            // 5 XRP at $1.041868 is $5.20, all of it credit.
+            expect(await manager.creditCents(accountId)).to.equal(creditAfterClose + 520n);
         });
 
         it("refuses a payment too small to be worth a cent", async () => {
