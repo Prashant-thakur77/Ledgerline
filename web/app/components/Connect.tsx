@@ -40,7 +40,7 @@ function readable(message: string) {
         return "You dismissed the wallet prompt. Press connect again when you are ready.";
     }
     if (/already pending|Request of type/i.test(message)) {
-        return "Your wallet already has a connection request open — check the extension window.";
+        return "Your wallet already has a connection request open. Check the extension window.";
     }
     if (/No injected provider|Connector not found|provider is undefined/i.test(message)) {
         return "No wallet extension responded. If you have just installed one, reload the page.";
@@ -62,12 +62,12 @@ export function Connect({ compact = false }: { compact?: boolean }) {
                     No Ethereum wallet found in this browser.
                 </p>
                 <p className="quiet" style={{ marginBottom: 0 }}>
-                    Ledgerline needs one to sign transactions — it never signs on your behalf. Install{" "}
+                    Ledgerline needs one to sign transactions. It never signs on your behalf. Install{" "}
                     <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">
                         MetaMask
                     </a>{" "}
-                    (or any injected wallet), reload this page, and add the <strong>Coston2</strong> testnet —
-                    the app will offer to switch you there automatically. Everything on the landing page,
+                    (or any injected wallet), reload this page, and add the <strong>Coston2</strong> testnet.
+                    The app will offer to switch you there automatically. Everything on the landing page,
                     including the proven figure and its Merkle root, is readable without a wallet.
                 </p>
             </div>

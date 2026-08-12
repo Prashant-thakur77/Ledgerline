@@ -62,7 +62,7 @@ export function LiveProof() {
         return (
             <div className="proofcard">
                 <span className="quiet">Reading the latest attested period from Coston2…</span>
-                <span className="figure pending">$—</span>
+                <span className="figure pending">$…</span>
                 <span className="unproven">connecting to the contract</span>
             </div>
         );
@@ -71,7 +71,7 @@ export function LiveProof() {
     return (
         <div className="proofcard">
             <span className="quiet">
-                Proven on chain for the period ending {day(newest.periodEnd)} — a real Stripe account, read by
+                Proven on chain for the period ending {day(newest.periodEnd)}. A real Stripe account, read by
                 Flare&apos;s Data Connector
             </span>
             <span className="figure amount">{usd(newest.revenueCents)}</span>

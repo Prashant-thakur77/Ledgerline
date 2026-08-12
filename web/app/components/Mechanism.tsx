@@ -46,7 +46,7 @@ const STAGES: Stage[] = [
     },
     {
         title: "The money arrives",
-        detail: "FXRP on Flare, or real XRP on the XRP Ledger — redeemed through FAssets so an agent pays the borrower's XRPL account directly.",
+        detail: "FXRP on Flare, or real XRP on the XRP Ledger, redeemed through FAssets so an agent pays the borrower's XRPL account directly.",
         flare: "FAssets · FXRP",
     },
     {
@@ -56,7 +56,7 @@ const STAGES: Stage[] = [
     },
     {
         title: "Or the borrower repays in XRP",
-        detail: "A plain XRP payment, carrying the account id in its memo, proven on Flare by a second FDC attestation type. Funded in real XRP, repaid in real XRP — the obligation never leaves Flare, and the borrower never needs an EVM asset in either direction.",
+        detail: "A plain XRP payment, carrying the account id in its memo, proven on Flare by a second FDC attestation type. Funded in real XRP, repaid in real XRP. The obligation never leaves Flare, and the borrower never needs an EVM asset in either direction.",
         flare: "FDC · Payment",
         attested: true,
     },

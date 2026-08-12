@@ -155,7 +155,7 @@ export function useAttestation() {
                 say(`request fee ${Number(fee) / 1e18} C2FLR`, "muted");
 
                 phase("awaiting-request-signature");
-                say("submitting the request to FdcHub — confirm in your wallet");
+                say("submitting the request to FdcHub. Confirm in your wallet");
                 const requestTx = await writeContractAsync({
                     address: fdcHub,
                     abi: fdcHubAbi,
@@ -253,7 +253,7 @@ export function useAttestation() {
                     await sleep(10_000);
                 }
                 if (stop()) return;
-                if (!finalised) throw new Error("The voting round did not finalise in time. It may still land — try again shortly.");
+                if (!finalised) throw new Error("The voting round did not finalise in time. It may still land, so try again shortly.");
 
                 const root = (await client.readContract({
                     address: relay,
@@ -283,7 +283,7 @@ export function useAttestation() {
                     await sleep(8_000);
                 }
                 if (stop()) return;
-                if (!proof) throw new Error("The DA layer did not return a proof in time. The round finalised, so it should appear shortly — try again.");
+                if (!proof) throw new Error("The DA layer did not return a proof in time. The round finalised, so it should appear shortly. Try again.");
 
                 say(
                     `proof retrieved · ${proof.proof.length} Merkle sibling${proof.proof.length === 1 ? "" : "s"}`,
@@ -308,7 +308,7 @@ export function useAttestation() {
                 })) as `0x${string}`;
 
                 phase("awaiting-store-signature");
-                say("storing the verified figure on chain — confirm in your wallet");
+                say("storing the verified figure on chain. Confirm in your wallet");
 
                 // viem hands back a frozen decode result; rebuild it as a plain object to pass as an argument.
                 const data = {

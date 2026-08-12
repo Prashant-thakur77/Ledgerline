@@ -137,7 +137,7 @@ function describe(e: Event): { text: string; attested: boolean } {
                 attested: true,
             };
         case "closed":
-            return { text: "Advance closed — nothing outstanding", attested: false };
+            return { text: "Advance closed. Nothing outstanding", attested: false };
         default:
             return { text: e.kind, attested: false };
     }
@@ -160,7 +160,7 @@ export function ActivityFeed({ accountId }: { accountId?: string }) {
         return (
             <div className="block">
                 <p className="quiet" style={{ margin: 0 }}>
-                    Nothing yet. Prove a period above and it appears here — every attestation, advance and
+                    Nothing yet. Prove a period above and it appears here: every attestation, advance and
                     repayment this account has ever made, read back from the contracts&apos; own events.
                 </p>
             </div>

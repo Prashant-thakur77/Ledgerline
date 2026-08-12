@@ -74,8 +74,8 @@ export function ProveRevenue({
                     </>
                 ) : (
                     <>
-                        This runs the identical pipeline — same verifier, same voting round, same Merkle proof, same
-                        on-chain verification — against a public keyless endpoint standing in for a payment
+                        This runs the identical pipeline (same verifier, same voting round, same Merkle proof, same
+                        on-chain verification) against a public keyless endpoint standing in for a payment
                         processor. The attestation is entirely real. The figure it carries, $
                         {(SANDBOX_CENTS / 100).toLocaleString("en-US")}, is a stand-in and is{" "}
                         <strong>not revenue</strong>. Proving it binds the account to your wallet, so you can then
@@ -93,7 +93,7 @@ export function ProveRevenue({
             {blocked ? (
                 <p className="alert" style={{ marginBottom: 0 }}>
                     This account is already bound to the wallet that first proved it, so only that wallet can store
-                    new periods for it — that guard is in RevenueOracle, not in this page. Switch to{" "}
+                    new periods for it. That guard is in RevenueOracle, not in this page. Switch to{" "}
                     <em>Yours</em> above to run the same attestation against an account you own.
                 </p>
             ) : (

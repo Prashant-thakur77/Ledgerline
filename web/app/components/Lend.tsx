@@ -78,11 +78,11 @@ export function Lend() {
 
             <p className="quiet" style={{ marginTop: 14 }}>
                 Deposits earn the origination fees and repayment flow of every advance, and absorb write-offs
-                the same way — in the share price, visibly. Two things to know before depositing: the pool
+                the same way: in the share price, visibly. Two things to know before depositing: the pool
                 holds FXRP against dollar-denominated debts, so <strong>you carry XRP/USD drift</strong>{" "}
                 between disbursement and repayment; and a repayment made on the XRP Ledger{" "}
                 <strong>dips the share price</strong> until the operator re-mints that XRP and returns it.
-                Withdrawals are limited to idle liquidity — an advance cannot be recalled.
+                Withdrawals are limited to idle liquidity, because an advance cannot be recalled.
             </p>
 
             {isConnected ? (
@@ -152,7 +152,7 @@ export function Lend() {
                         </a>
                     )}
                     <p className="quiet" style={{ marginTop: 12, marginBottom: 0 }}>
-                        Wallet FXRP: {walletFxrp !== undefined ? fxrp(walletFxrp) : "…"} — claim more at the{" "}
+                        Wallet FXRP: {walletFxrp !== undefined ? fxrp(walletFxrp) : "…"} · claim more at the{" "}
                         <a href="https://faucet.flare.network/coston2" target="_blank" rel="noreferrer">
                             Coston2 faucet
                         </a>

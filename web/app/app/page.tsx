@@ -234,7 +234,7 @@ export default function Page() {
                     <tr key={i} className={freshPeriod === String(r.periodEnd) ? "fresh" : undefined}>
                         <td>
                             <span className="mono">
-                                {day(r.periodStart)} — {day(r.periodEnd)}
+                                {day(r.periodStart)} → {day(r.periodEnd)}
                             </span>
                         </td>
                         <td className="right">
@@ -264,7 +264,7 @@ export default function Page() {
                 <h1>Connect a wallet to begin.</h1>
                 <p className="lede">
                     Everything below is already live on Coston2 and readable without connecting. A wallet is
-                    needed only to sign — this site never signs for you and never holds a key.
+                    needed only to sign. This site never signs for you and never holds a key.
                 </p>
                 <p className="quiet">
                     New here? <Link href="/">The overview explains what this is</Link> before you connect
@@ -438,8 +438,8 @@ export default function Page() {
                             {cleanCycles !== undefined && Number(cleanCycles) > 0 && (
                                 <> after {Number(cleanCycles)} cleanly repaid advance{Number(cleanCycles) === 1 ? "" : "s"}</>
                             )}
-                            . New accounts start at 2.5% — deliberately below card-processing fees, so faking
-                            revenue at yourself costs more than it frees — and every advance repaid in full
+                            . New accounts start at 2.5%, deliberately below card-processing fees so faking
+                            revenue at yourself costs more than it frees, and every advance repaid in full
                             without delinquency raises it. Every input is on chain.
                         </>
                     )}
@@ -529,7 +529,7 @@ export default function Page() {
                         {(credit ?? 0n) > 0n && (
                             <div className="row">
                                 <span>Banked credit (XRPL overpayment)</span>
-                                <span className="mono">{usd(credit!)} — settles this at origination</span>
+                                <span className="mono">{usd(credit!)} · settles this at origination</span>
                             </div>
                         )}
                         <div className="row">
@@ -548,8 +548,8 @@ export default function Page() {
                         {treasuryDry && (
                             <p className="alert" style={{ marginTop: 14, marginBottom: 0 }}>
                                 No lending liquidity is available right now, so an advance cannot be issued.
-                                Everything above is live — the proven revenue, the limit and the price are read
-                                from chain — and a deposit in the Lend section below reopens originations.
+                                Everything above is live: the proven revenue, the limit and the price are read
+                                from chain. A deposit in the Lend section below reopens originations.
                             </p>
                         )}
 
@@ -643,7 +643,7 @@ export default function Page() {
                         </div>
                         <p className="quiet" style={{ marginTop: 14, marginBottom: 0 }}>
                             Those two rates differ and the amount owed above has not changed. That is what FTSOv2 is
-                            doing here — without it the debt would be denominated in XRP and would move with the
+                            doing here. Without it the debt would be denominated in XRP and would move with the
                             price.
                         </p>
                     </div>
@@ -668,7 +668,7 @@ export default function Page() {
                             <p style={{ marginTop: 0 }}>
                                 Or repay in <strong>real XRP, from the XRP Ledger</strong>. Send an ordinary
                                 payment to the account below, carrying this account id as the payment reference,
-                                and an FDC <span className="mono">Payment</span> attestation proves it on Flare —
+                                and an FDC <span className="mono">Payment</span> attestation proves it on Flare:
                                 a second attestation type, verified the same way the revenue was.
                             </p>
                             <div className="row">
@@ -680,7 +680,7 @@ export default function Page() {
                                 <span className="mono break">{accountId}</span>
                             </div>
                             <p className="quiet" style={{ marginTop: 14, marginBottom: 0 }}>
-                                The reference has to be a single memo of exactly that value — the XRP
+                                The reference has to be a single memo of exactly that value. The XRP
                                 Ledger&apos;s <span className="mono">InvoiceID</span> field looks like the right
                                 place and FDC does not read it. Neither leg of this route needs an EVM asset.
                             </p>

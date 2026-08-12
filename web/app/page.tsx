@@ -9,7 +9,7 @@ import { Stat } from "./components/Stat";
 import { FlareBadge, Marquee, Grain, ScrollProgress, Aurora } from "./components/Chrome";
 
 export const metadata: Metadata = {
-    title: "Ledgerline — borrow against revenue you can prove",
+    title: "Ledgerline: borrow against revenue you can prove",
     description:
         "Your payment processor already proves you earn four thousand dollars a month. No lender can read it, and Flare's Data Connector can. Advances against attested revenue, settled in FXRP or real XRP.",
 };
@@ -76,7 +76,7 @@ export default function Landing() {
                             <p className="narrow">
                                 Flare&apos;s Data Connector reads it instead. It calls the API, the
                                 network&apos;s own data providers agree on the answer, and the figure arrives
-                                on chain with a Merkle proof — proven the way a price feed is proven. Nobody
+                                on chain with a Merkle proof, proven the way a price feed is proven. Nobody
                                 vouches for it. There is nobody to bribe.
                             </p>
                         </Reveal>
@@ -90,7 +90,7 @@ export default function Landing() {
                                 </a>
                             </div>
                             <p className="quiet" style={{ marginTop: 22 }}>
-                                Live on Coston2 testnet. You can run a real FDC attestation yourself — no
+                                Live on Coston2 testnet. You can run a real FDC attestation yourself. No
                                 Stripe account needed.
                             </p>
                         </Reveal>
@@ -116,7 +116,7 @@ export default function Landing() {
                         <Reveal delay={140}>
                             <p className="narrow" style={{ marginTop: 26 }}>
                                 That green line is the whole product. It names which API the figure came from,
-                                which FDC voting round agreed on it, and the Merkle root it resolves to — and
+                                which FDC voting round agreed on it, and the Merkle root it resolves to, and
                                 it opens the transaction that verified it.{" "}
                                 <strong>You can check every part of it without asking us anything.</strong>
                             </p>
@@ -150,7 +150,7 @@ export default function Landing() {
                                 {
                                     n: "02",
                                     h: "The usual workaround reinstates the middleman",
-                                    p: "Trust a company's server to sign the figure and you have rebuilt exactly the intermediary the system was supposed to remove — with a single key to steal or subpoena.",
+                                    p: "Trust a company's server to sign the figure and you have rebuilt exactly the intermediary the system was supposed to remove, with a single key to steal or subpoena.",
                                 },
                                 {
                                     n: "03",
@@ -176,7 +176,7 @@ export default function Landing() {
                             <h2>From a Stripe balance to XRP in a wallet</h2>
                             <p className="narrow" style={{ marginTop: 20 }}>
                                 Seven stages, in the order they actually happen. The two marked in green are
-                                the ones a network agreed on — everything else is ordinary machinery.
+                                the ones a network agreed on. Everything else is ordinary machinery.
                             </p>
                         </Reveal>
                         <Reveal delay={80}>
@@ -215,7 +215,7 @@ export default function Landing() {
                         </Reveal>
 
                         <Reveal delay={110}>
-                            <h3 className="sub">The loop closes — funded in real XRP, repaid in real XRP</h3>
+                            <h3 className="sub">The loop closes: funded in real XRP, repaid in real XRP</h3>
                             <ul className="evidence">
                                 <li>
                                     <span>Advance redeemed through FAssets, one lot</span>
@@ -275,11 +275,11 @@ export default function Landing() {
                                 },
                                 {
                                     h: "The Stripe key is published on chain",
-                                    p: "FDC requests are public calldata, so the key travels in the clear. That breaks confidentiality, not trust — the figure is still proven by the network. It is a read-only restricted key, and the code refuses a full secret key outright.",
+                                    p: "FDC requests are public calldata, so the key travels in the clear. That breaks confidentiality, not trust: the figure is still proven by the network. It is a read-only restricted key, and the code refuses a full secret key outright.",
                                 },
                                 {
                                     h: "Public revenue is the adoption blocker",
-                                    p: "Almost no business will publish its monthly revenue permanently. The fix is Flare Confidential Compute — underwrite inside a TEE, publish only the decision. Specified in the README, deliberately not built.",
+                                    p: "Almost no business will publish its monthly revenue permanently. The fix is Flare Confidential Compute: underwrite inside a TEE, publish only the decision. Specified in the README, deliberately not built.",
                                 },
                             ].map((c, i) => (
                                 <Reveal key={c.h} delay={i * 90} className="card">
