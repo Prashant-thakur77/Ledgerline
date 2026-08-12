@@ -630,33 +630,58 @@ button.wide {
 
 /* ---------------------------------------------------------------- cards & stats */
 
+/*
+ * The lattice. Cards are black cells separated by one-pixel gaps over a hairline ground, so the grid reads
+ * as ruled paper rather than floating boxes. A cell inverts to white on hover: the strongest state change
+ * a monochrome page can make, and it costs one background and one colour transition.
+ */
 .cards {
     display: grid;
-    gap: 18px;
+    gap: 1px;
     margin-top: 40px;
 }
 
 @media (min-width: 741px) {
     .cards {
         grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
     }
 }
 
 .card {
     position: relative;
-    padding: 26px 24px;
+    padding: 30px 28px 34px;
     border-radius: 0;
-    border: 1px solid var(--hairline);
-    background: var(--surface);
-    transition:
-        border-color 220ms var(--ease),
-        transform 220ms var(--ease);
+    border: 0;
+    /*
+     * The hairline is an outline on the cell rather than a backdrop behind the grid: cells enter with a
+     * staggered reveal, and a grid-wide backdrop showed through them as a grey slab until every cell had
+     * finished arriving. Outlines on adjacent cells coincide in the 1px gap, which is the lattice.
+     */
+    outline: 1px solid rgba(255, 255, 255, 0.12);
+    background: #000000;
+    transition: background 320ms var(--ease);
 }
 
 .card:hover {
-    border-color: rgba(255, 255, 255, 0.4);
-    transform: translateY(-2px);
+    background: #ffffff;
+}
+
+.card:hover h3 {
+    color: #000000;
+}
+
+.card:hover p {
+    color: #374151;
+}
+
+.card:hover .card-n {
+    color: rgba(0, 0, 0, 0.45);
+}
+
+.card h3,
+.card p,
+.card .card-n {
+    transition: color 320ms var(--ease);
 }
 
 .card h3 {
@@ -1626,16 +1651,7 @@ h3.sub {
     to { transform: translateX(120%); }
 }
 
-/* Cards — lift toward the cursor's attention; the top rule warms. */
-.cards .card {
-    transition: transform 200ms cubic-bezier(0.2, 0.6, 0.3, 1), border-color 200ms ease, box-shadow 200ms ease;
-}
 
-.cards .card:hover {
-    transform: translateY(-4px);
-    border-top-color: #ffffff;
-    box-shadow: 0 18px 40px -24px var(--flare-glow);
-}
 
 /* Gradient headline — the brand wash slides through it once in a while, like light over foil. */
 
@@ -1757,10 +1773,7 @@ h2::after {
     pointer-events: none;
 }
 
-/* The problem cards get a hint of the same depth on hover, statically. */
-.cards .card:hover {
-    transform: translateY(-4px) perspective(700px) rotateX(1.6deg);
-}
+
 
 /* The whisper after the wordmark: what we do, in three words, hidden where space is tight. */
 .brand-tag {

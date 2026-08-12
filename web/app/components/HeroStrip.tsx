@@ -48,15 +48,15 @@ export function HeroStrip() {
         <div className="herostrip">
             <div>
                 <span className="herostrip-label">Attestations on chain</span>
-                <span className="herostrip-value">{stats ? stats.attestations : "—"}</span>
+                <span className="herostrip-value">{stats ? stats.attestations : "…"}</span>
             </div>
             <div>
                 <span className="herostrip-label">Revenue proven</span>
-                <span className="herostrip-value">{stats ? usd(stats.provenCents) : "—"}</span>
+                <span className="herostrip-value">{stats ? usd(stats.provenCents) : "…"}</span>
             </div>
             <div>
                 <span className="herostrip-label">Coston2 block</span>
-                <span className="herostrip-value">{block ? block.toLocaleString("en-US") : "—"}</span>
+                <span className="herostrip-value">{block ? block.toLocaleString("en-US") : "…"}</span>
             </div>
             <div>
                 <span className="herostrip-label">Test suite</span>

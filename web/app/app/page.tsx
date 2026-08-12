@@ -261,12 +261,18 @@ export default function Page() {
             <Grain />
             <AppHeader />
             <main className="app-main">
+                {/*
+                 * The action first. This page has exactly one thing a visitor came to do, and an earlier
+                 * version put the connect button at the very bottom, after every piece of reference
+                 * material — an interface that makes you scroll past the encyclopaedia to find the door.
+                 */}
                 <h1>Connect a wallet to begin.</h1>
                 <p className="lede">
                     Everything below is already live on Coston2 and readable without connecting. A wallet is
                     needed only to sign. This site never signs for you and never holds a key.
                 </p>
-                <p className="quiet">
+                <Connect />
+                <p className="quiet" style={{ marginTop: 14 }}>
                     New here? <Link href="/">The overview explains what this is</Link> before you connect
                     anything.
                 </p>
@@ -305,17 +311,14 @@ export default function Page() {
                     </>
                 )}
 
-                <h2>How it works</h2>
-                <Mechanism />
+                <h2>What this account has done</h2>
+                <ActivityFeed accountId={accountId} />
 
                 <h2>Lend</h2>
                 <Lend />
 
-                <h2>What this account has done</h2>
-                <ActivityFeed accountId={accountId} />
-
-                <h2>Connect</h2>
-                <Connect />
+                <h2>How it works</h2>
+                <Mechanism />
             </main>
             </>
         );
@@ -343,7 +346,13 @@ export default function Page() {
         <Grain />
         <AppHeader account={address} onDisconnect={() => disconnect()} />
         <main className="app-main">
-            <h1>Proofline</h1>
+            {/* The header already says Proofline; repeating it here spent the page's largest type on a
+                word the visitor just read. The h1 now names what this page is for. */}
+            <h1>
+                Prove. Borrow.
+                <br />
+                <span className="grad">Repay.</span>
+            </h1>
             <div className="row" style={{ padding: 0 }}>
                 <span className="mono">
                     {platform}/{view === "stripe" ? accountRef : short(accountRef || "0x")}

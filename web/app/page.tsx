@@ -61,7 +61,7 @@ export default function Landing() {
                     <RevenueLine />
                     <div className="shell hero-in">
                         <Reveal>
-                            <p className="eyebrow">Flare Summer Signal — live on Coston2</p>
+                            <p className="eyebrow">Flare Summer Signal · live on Coston2</p>
                         </Reveal>
                         <Reveal delay={70}>
                             {/* Two lines, one voice: the first in white, the turn of the sentence in grey. */}
@@ -78,7 +78,7 @@ export default function Landing() {
                                 <p className="lede narrow" style={{ marginBottom: 0 }}>
                                     Your payment processor already knows what you earn. No lender can read
                                     it, so no lender will price it. Flare&apos;s Data Connector reads it
-                                    instead — the network&apos;s own providers agree on the figure, and it
+                                    instead. The network&apos;s own providers agree on the figure, and it
                                     lands on chain with a Merkle proof. Nobody vouches for it. There is
                                     nobody to bribe.
                                 </p>
