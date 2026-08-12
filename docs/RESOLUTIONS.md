@@ -59,8 +59,11 @@ provider consensus over attested hardware.
 **Status:** partially **BUILT** — see [`fcc/`](../fcc/): the underwriting extension is implemented on
 Flare's own scaffold (wire-conformant, 16/16 golden fixtures, 60 unit tests, no revenue in its output by
 test), and `PrivateUnderwriter.sol` verifies enclave-signed decisions against a registered code measurement
-(7 tests). What remains is platform registration, which is gated on Flare's VPN-access indexer — access,
-not code. The enclave path stays out of the live product until that registration exists. 💰 enclave hosting
+(7 tests). What remains is platform registration. Correction from the hackathon channel: Coston2's
+indexer is not VPN-gated (that is Coston); it takes pinned hackathon credentials, and simulated TEEs are
+supported to PRODUCTION — so registration is achievable, at the cost of an infrastructure gauntlet
+(stable HTTPS tunnel, pinned version set, flaky availability-check polling) that the channel shows eating
+teams' hours. The enclave path stays out of the live product until that registration exists. 💰 enclave hosting
 (~$100–500/mo on confidential VMs) when built.
 **Resolved when:** an account is underwritten with no revenue figure anywhere on chain, and an outside
 auditor reproduces the enclave image to the registered hash.

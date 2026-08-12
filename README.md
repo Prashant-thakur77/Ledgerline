@@ -185,7 +185,8 @@ before storing it:
 
 Two trust models, one answer: the FDC provider-quorum path and the enclave path price the account the same,
 which is what lets them coexist as a choice rather than a migration. Platform registration (which would move
-the signing key into attested hardware) is gated on Flare's VPN-access indexer and stated as such in
+the signing key into attested hardware) is achievable on Coston2 with hackathon-pinned indexer
+credentials but is an infrastructure gauntlet of its own; the honest status lives in
 [fcc/README.md](fcc/README.md).
 
 ## Deployed on Coston2 (chain id 114)

@@ -28,9 +28,14 @@ The Phase-4 mechanism from [docs/RESOLUTIONS.md](../docs/RESOLUTIONS.md), built 
 
 ## What is deliberately not claimed
 
-Registration on Flare's shared TEE platform (Coston2) requires **VPN access to Flare's indexer database**
-(`docs/deployment-steps.md`, Prerequisites) — granted platform access, not code. That gate is precisely
-where hackathon teams before us lost days, so this integration stops honestly at the line code can reach:
+Registration on Flare's shared TEE platform is access-gated, and the shape of that gate matters:
+the scaffold's deployment docs describe a VPN-gated indexer, but that applies to **Coston**. Per the
+hackathon channel, **Coston2's** indexer (34.38.42.208:3306) is reachable with read-only hackathon
+credentials pinned in the official Telegram, and `SIMULATED_TEE=true` machines are organizer-supported
+through to PRODUCTION. So registration here is achievable rather than blocked; it needs the pinned
+credentials, a stable public HTTPS tunnel for the extension proxy, and the current pinned version set —
+and the channel shows teams losing hours to proxy 404s and version skew even so. This integration
+currently stops at the line before that infrastructure gauntlet:
 the extension is wire-conformant and the verifier contract is tested, and until platform registration the
 "enclave key" is whatever governance sets. Registration upgrades **who holds the key**, not how anything
 is verified. `SIMULATED_TEE=true` runs the whole stack on a laptop; real confidential hardware is a
