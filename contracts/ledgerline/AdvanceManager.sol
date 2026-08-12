@@ -66,11 +66,28 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     IERC20 public immutable fxrp;
     uint8 public immutable fxrpDecimals;
 
-    uint16 public factorBps = 10_000; // 1.0x the monthly average for a first advance
+    /*
+     * The tier schedule. An account's factor starts at `baseFactorBps` and earns `stepFactorBps` more with
+     * every advance repaid in full without ever going delinquent, up to `capFactorBps`.
+     *
+     * The base is deliberately below card-processing fees (~2.9%): the fundamental attack on revenue-based
+     * credit is paying yourself through your own processor and defaulting, and a first advance smaller than
+     * what the fabrication cost makes that attack lose money before any other signal is consulted.
+     * Accounts younger than `minAccountAgeSeconds` (or with no attested age at all) stay at the base
+     * regardless of history.
+     */
+    uint16 public baseFactorBps = 250; // 2.5% of the monthly base for an unproven account
+    uint16 public stepFactorBps = 2_000; // +20 points per cleanly repaid advance
+    uint16 public capFactorBps = 10_000; // 1.0x, after roughly five honest cycles
+    uint64 public minAccountAgeSeconds = 30 days;
+
     uint16 public feeBps = 500; // 5% origination fee
     uint16 public repaymentShareBps = 2_000; // 20% of each attested period
     uint256 public maxAdvanceCents = 10_000_000; // $100,000 hard cap
     uint64 public gracePeriod = 45 days;
+
+    /// @notice Advances repaid in full without ever being marked delinquent. The account's reputation.
+    mapping(bytes32 => uint32) public closedCleanCycles;
 
     uint256 public treasuryBalance;
 
@@ -134,6 +151,7 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     );
     event AssetManagerSet(address assetManager);
     event MarkedDelinquent(bytes32 indexed accountId, uint256 outstandingCents);
+    event FactorScheduleSet(uint16 baseFactorBps, uint16 stepFactorBps, uint16 capFactorBps, uint64 minAccountAgeSeconds);
     event XrplTreasurySet(string xrplAddress, bytes32 xrplAddressHash, bytes32 sourceId);
     /// @notice A repayment that arrived as real XRP on the XRP Ledger and was proven by FDC.
     event RepaidFromXrpl(
@@ -176,13 +194,31 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
     // ---------------------------------------------------------------- underwriting
 
     /**
-     * @notice The advance a borrower may take: the mean of the last three attested months, times the factor,
-     * capped. Deliberately simple so it can be explained in one sentence and checked by hand.
+     * @notice The factor this account has earned. Base for everyone; a step per cleanly repaid advance;
+     * pinned to the base while the account is young or its age is simply unknown.
+     * @dev Every input is on chain, so the tier a borrower is priced at can be checked by hand.
+     */
+    function accountFactorBps(bytes32 accountId) public view returns (uint16) {
+        uint64 createdAt = oracle.accountCreatedAt(accountId);
+        if (createdAt == 0 || block.timestamp < uint256(createdAt) + minAccountAgeSeconds) {
+            return baseFactorBps;
+        }
+        uint256 factor = uint256(baseFactorBps) + uint256(stepFactorBps) * closedCleanCycles[accountId];
+        return factor >= capFactorBps ? capFactorBps : uint16(factor);
+    }
+
+    /**
+     * @notice The advance a borrower may take: the smaller of the recent mean and the latest period, times
+     * the factor the account has earned, capped. Still explainable in one sentence and checkable by hand.
+     * @dev `min(mean, latest)` rather than the mean alone, so a collapsing business is priced on its
+     * collapse instead of its history.
      */
     function advanceLimitCents(bytes32 accountId) public view returns (uint256) {
-        (uint256 avg, ) = _averageRevenue(accountId);
-        if (avg == 0) return 0;
-        uint256 limit = (avg * factorBps) / 10_000;
+        (uint256 avg, uint8 periodsUsed) = _averageRevenue(accountId);
+        if (avg == 0 || periodsUsed == 0) return 0;
+        uint256 latest = oracle.latestRevenue(accountId).revenueCents;
+        uint256 base = latest < avg ? latest : avg;
+        uint256 limit = (base * accountFactorBps(accountId)) / 10_000;
         return limit > maxAdvanceCents ? maxAdvanceCents : limit;
     }
 
@@ -290,7 +326,7 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         advance.open = true;
         advance.avgRevenueCents = avg;
         advance.periodsUsed = periodsUsed;
-        advance.factorBps = factorBps;
+        advance.factorBps = accountFactorBps(accountId);
         advance.xrpUsdPrice = price;
         advance.priceDecimals = priceDecimals;
 
@@ -350,7 +386,11 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         treasuryBalance += fxrpAmount;
 
         bool closed = advance.outstandingCents == 0;
-        if (closed) advance.open = false;
+        if (closed) {
+            advance.open = false;
+            // A cycle only counts toward the tier schedule if it was never delinquent along the way.
+            if (!advance.delinquent) closedCleanCycles[accountId] += 1;
+        }
 
         fxrp.safeTransferFrom(borrower, address(this), fxrpAmount);
 
@@ -416,7 +456,11 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         advance.lastActivityAt = uint64(block.timestamp);
 
         bool closed = advance.outstandingCents == 0;
-        if (closed) advance.open = false;
+        if (closed) {
+            advance.open = false;
+            // Same rule as the FXRP path: only a never-delinquent cycle earns tier progress.
+            if (!advance.delinquent) closedCleanCycles[accountId] += 1;
+        }
 
         /*
          * Deliberately no change to `treasuryBalance`. The XRP landed in an XRP Ledger account, not as FXRP
@@ -488,6 +532,26 @@ contract AdvanceManager is Ownable, ReentrancyGuard {
         if (price == 0) revert InvalidPrice();
         uint256 priceScale = 10 ** uint256(uint8(priceDecimals));
         return (drops * price * 100) / (priceScale * DROPS_PER_XRP);
+    }
+
+    /**
+     * @notice Set the tier schedule. Owner-only today; moves behind a timelock with the lender pool,
+     * because these four numbers are the underwriting policy.
+     * @dev `base > cap` is rejected; `base` above ~290 (card fees) reopens the recycling attack, which is
+     * a policy decision the event makes visible rather than a constraint the contract enforces.
+     */
+    function setFactorSchedule(
+        uint16 newBaseFactorBps,
+        uint16 newStepFactorBps,
+        uint16 newCapFactorBps,
+        uint64 newMinAccountAgeSeconds
+    ) external onlyOwner {
+        if (newBaseFactorBps > newCapFactorBps) revert InvalidAmount();
+        baseFactorBps = newBaseFactorBps;
+        stepFactorBps = newStepFactorBps;
+        capFactorBps = newCapFactorBps;
+        minAccountAgeSeconds = newMinAccountAgeSeconds;
+        emit FactorScheduleSet(newBaseFactorBps, newStepFactorBps, newCapFactorBps, newMinAccountAgeSeconds);
     }
 
     function setAssetManager(address newAssetManager) external onlyOwner {

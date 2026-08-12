@@ -61,6 +61,8 @@ async function setup() {
     const manager = await Manager.deploy(await oracle.getAddress(), await fxrp.getAddress());
     await manager.waitForDeployment();
     await manager.setXrpUsd(XRP_USD, PRICE_DECIMALS);
+    // Legacy tests predate the tier schedule; pin the flat 1.0x factor they assume.
+    await manager.setFactorSchedule(10_000, 0, 10_000, 0);
 
     // Fund the treasury with 10,000 FXRP.
     const treasury = 10_000n * 10n ** BigInt(FXRP_DECIMALS);

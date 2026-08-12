@@ -124,19 +124,52 @@ export function stripeBalanceSource(w: Window, apiKey: string): SourceConfig {
         headers: JSON.stringify({ Authorization: `Bearer ${apiKey}` }),
         queryParams: JSON.stringify({ limit: "100" }),
         body: "{}",
+        /*
+         * Refunds and chargebacks are their own rows with negative `net`, so summing charges alone
+         * overstates revenue for any account that refunds. They are counted here, and the sum is clamped
+         * at zero — a month more refunded than earned is zero revenue, not negative collateral.
+         */
         postProcessJq: [
             `{`,
             `platform: "stripe",`,
             `accountRef: "${w.accountRef}",`,
-            `revenueCents: ([.data[]`,
-            `| select(.reporting_category == "charge")`,
+            `revenueCents: (([.data[]`,
+            `| select(.reporting_category == "charge" or .reporting_category == "refund" or .reporting_category == "adjustment")`,
             `| select(.currency == "usd")`,
             `| select(.created >= ${w.periodStart} and .created < ${w.periodEnd})`,
-            `| .net] | add // 0),`,
+            `| .net] | add // 0) | if . < 0 then 0 else . end),`,
             `periodStart: ${w.periodStart},`,
             `periodEnd: ${w.periodEnd}`,
             `}`,
         ].join(" "),
+    };
+}
+
+/** Must stay in step with RevenueOracle.ProfileDTO. */
+export const PROFILE_ABI_SIGNATURE = JSON.stringify({
+    components: [
+        { internalType: "string", name: "platform", type: "string" },
+        { internalType: "string", name: "accountRef", type: "string" },
+        { internalType: "uint256", name: "createdAt", type: "uint256" },
+    ],
+    name: "task",
+    type: "tuple",
+});
+
+/**
+ * Stripe's own record of when the account was created, for the underwriting age gate. Reads `/v1/account`,
+ * which the restricted key must be scoped to (read-only, like everything else it can see).
+ */
+export function stripeProfileSource(accountRef: string, apiKey: string): SourceConfig {
+    assertRestricted(apiKey);
+    return {
+        platform: "stripe",
+        url: "https://api.stripe.com/v1/account",
+        httpMethod: "GET",
+        headers: JSON.stringify({ Authorization: `Bearer ${apiKey}` }),
+        queryParams: "{}",
+        body: "{}",
+        postProcessJq: `{ platform: "stripe", accountRef: "${accountRef}", createdAt: .created }`,
     };
 }
 

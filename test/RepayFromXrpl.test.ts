@@ -113,6 +113,8 @@ async function setup() {
     const Manager = await ethers.getContractFactory("AdvanceManagerHarness");
     const manager = await Manager.deploy(await oracle.getAddress(), await fxrp.getAddress());
     await manager.setXrpUsd(XRP_USD, PRICE_DECIMALS);
+    // Legacy tests predate the tier schedule; pin the flat 1.0x factor they assume.
+    await manager.setFactorSchedule(10_000, 0, 10_000, 0);
     await manager.setAssetManager(await assetManager.getAddress());
     await manager.setXrplTreasury(XRPL_TREASURY, TEST_XRP);
 
@@ -303,6 +305,8 @@ describe("Repaying from the XRP Ledger", () => {
             const Manager = await ethers.getContractFactory("AdvanceManagerHarness");
             const bare = await Manager.deploy(await oracle.getAddress(), await fxrp.getAddress());
             await bare.setXrpUsd(XRP_USD, PRICE_DECIMALS);
+            // Legacy tests predate the tier schedule; pin the flat 1.0x factor they assume.
+            await bare.setFactorSchedule(10_000, 0, 10_000, 0);
             await fxrp.mint(owner.address, 10n * LOT);
             await fxrp.approve(await bare.getAddress(), 10n * LOT);
             await bare.depositTreasury(10n * LOT);

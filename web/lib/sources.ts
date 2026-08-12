@@ -72,15 +72,20 @@ export function stripeBalanceSource(w: Window, apiKey: string): SourceConfig {
         headers: JSON.stringify({ Authorization: `Bearer ${apiKey}` }),
         queryParams: JSON.stringify({ limit: "100" }),
         body: "{}",
+        /*
+         * Refunds and chargebacks are their own rows with negative `net`, so summing charges alone
+         * overstates revenue for any account that refunds. They are counted, and the sum clamps at zero.
+         * MUST match scripts/ledgerline/revenue-sources.ts exactly — two pipelines, one figure.
+         */
         postProcessJq: [
             `{`,
             `platform: "stripe",`,
             `accountRef: "${w.accountRef}",`,
-            `revenueCents: ([.data[]`,
-            `| select(.reporting_category == "charge")`,
+            `revenueCents: (([.data[]`,
+            `| select(.reporting_category == "charge" or .reporting_category == "refund" or .reporting_category == "adjustment")`,
             `| select(.currency == "usd")`,
             `| select(.created >= ${w.periodStart} and .created < ${w.periodEnd})`,
-            `| .net] | add // 0),`,
+            `| .net] | add // 0) | if . < 0 then 0 else . end),`,
             `periodStart: ${w.periodStart},`,
             `periodEnd: ${w.periodEnd}`,
             `}`,
