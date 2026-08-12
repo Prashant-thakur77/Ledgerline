@@ -174,6 +174,57 @@ export function stripeProfileSource(accountRef: string, apiKey: string): SourceC
 }
 
 /**
+ * Shopify, read from the Admin API's orders endpoint. The second real platform, and the proof that the
+ * oracle's platform-agnosticism holds: RevenueOracle does not change, this entry is the whole integration.
+ *
+ * `current_total_price` is the order total after refunds at read time, in the shop's currency — pinned to
+ * USD the same way the Stripe filter pins it. Cancelled orders are excluded; partial refunds are already
+ * netted into the current total, which keeps this honest the same way `net` does for Stripe.
+ *
+ * PAGINATION, stated plainly: one page of up to 250 orders. A shop with more orders than that in the window
+ * is UNDER-counted, which is conservative in the only direction that matters for lending — it can deny
+ * credit that was deserved, never grant credit that was not. Per-page attestation summed on chain is the
+ * roadmap fix (docs/ROADMAP.md, phase 5).
+ *
+ * The access token needs `read_orders` only, and travels in public calldata exactly like the Stripe key —
+ * same disclosure, same mitigation, same enclave endgame.
+ */
+export function shopifyOrdersSource(w: Window, shopDomain: string, accessToken: string): SourceConfig {
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shopDomain)) {
+        throw new Error(`Expected a myshopify.com domain, got "${shopDomain}"`);
+    }
+    if (accessToken.startsWith("shpss_") || accessToken.startsWith("shpca_")) {
+        throw new Error("Refusing a shared/custom-app secret: use a read-only Admin API access token (shpat_…).");
+    }
+    return {
+        platform: "shopify",
+        url: `https://${shopDomain}/admin/api/2024-01/orders.json`,
+        httpMethod: "GET",
+        headers: JSON.stringify({ "X-Shopify-Access-Token": accessToken }),
+        queryParams: JSON.stringify({
+            status: "any",
+            limit: "250",
+            created_at_min: new Date(w.periodStart * 1000).toISOString(),
+            created_at_max: new Date(w.periodEnd * 1000).toISOString(),
+        }),
+        body: "{}",
+        postProcessJq: [
+            `{`,
+            `platform: "shopify",`,
+            `accountRef: "${w.accountRef}",`,
+            `revenueCents: (([.orders[]`,
+            `| select(.cancelled_at == null)`,
+            `| select(.currency == "USD")`,
+            `| (.current_total_price | tonumber * 100 | floor)] | add // 0)`,
+            `| if . < 0 then 0 else . end),`,
+            `periodStart: ${w.periodStart},`,
+            `periodEnd: ${w.periodEnd}`,
+            `}`,
+        ].join(" "),
+    };
+}
+
+/**
  * A public stand-in used to prove the pipeline end to end without credentials.
  *
  * It is NOT revenue. It reduces a public, keyless endpoint into the identical DTO so that everything
