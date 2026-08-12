@@ -370,6 +370,44 @@ until FAssets.
 
 **The demo runs on Stripe test mode.** The API responses are real; the money behind them is not.
 
+## Security model — attacks we know about and have not fixed
+
+The proofs above establish that the *data* cannot be forged: nobody can attest revenue Stripe did not
+report, and nobody can claim an XRPL payment that did not happen. What follows is the layer above that —
+ways to be honest with the machine and still cheat the economics. Naming them precisely matters more to us
+than appearing finished.
+
+**Revenue recycling is the fundamental attack on this whole category.** Pay *yourself* $4,000 through your
+own Stripe account (cost: roughly 3% in processing fees), attest it — the attestation is genuine, Stripe
+really did process it — borrow $4,000, and default. Every revenue-based lender on earth faces this; the
+off-chain ones fight it with KYC and bank-account cross-checks. On chain the honest mitigations are
+economic: advance factors for young accounts must sit **below** the card-processing fee so the attack loses
+money, limits must grow only with repayment history, and account age (which Stripe's API reports and FDC
+could attest) must gate the first advance. The current contract has a 1.0x factor from the first period —
+right for a demo, exploitable in production, and the parameters exist to be tightened.
+
+**Overlapping periods can fake a history.** The oracle requires each new period to *end* after the previous
+one, but not to *begin* after it — so three windows shifted by a day each count as three periods of history
+while covering essentially the same month of revenue. The averaging means this does not inflate the limit,
+but it defeats any future rule of the form "three months of history before borrowing". The fix is one line
+(`periodStart >= previous periodEnd`) and belongs to the next deployment rather than a rushed one now; our
+own demo data exhibits the pattern, which is how we noticed.
+
+**The testnet treasury can be drained by design.** Any visitor who runs the sandbox attestation gets a
+$4,000 limit against a treasury holding a few dollars of testnet FXRP. That asymmetry is deliberate — the
+whole point is that a stranger can complete a real loop — and the exposure is a faucet claim, refilled
+daily. In production this is the same problem as recycling, and has the same mitigations.
+
+**An XRPL overpayment is kept, not refunded.** `repayFromXrpl` credits a payment only up to the outstanding
+balance; XRP beyond that sits in the treasury's XRPL account with no on-chain path back. Rejecting the
+payment would be worse — XRPL payments are irreversible, so the debt would stand *and* the money would be
+taken. A refund leg needs the same payment machinery in reverse and is not built.
+
+**The owner is trusted.** The owner can withdraw the treasury and set the FAssets and XRPL wiring. That is
+acceptable while the treasury is the owner's own funds, and becomes unacceptable the moment outside lenders
+exist — the lender-side roadmap item carries multisig ownership and timelocks with it, not as an
+afterthought but as a precondition.
+
 ## The flaw in this design, and what fixes it
 
 The proof line is what makes this product trustworthy. It is also what makes it unusable for a real business.
