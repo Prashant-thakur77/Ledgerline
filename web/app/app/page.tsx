@@ -29,6 +29,7 @@ import { ProveRevenue } from "../components/ProveRevenue";
 import { Connect } from "../components/Connect";
 import { ProtocolStrip, ActivityFeed } from "../components/Activity";
 import { Journey } from "../components/Journey";
+import { Lend } from "../components/Lend";
 import { AppHeader } from "../components/AppHeader";
 import { Grain } from "../components/Chrome";
 
@@ -95,8 +96,29 @@ export default function Page() {
     const { data: treasury } = useReadContract({
         address: MANAGER_ADDRESS,
         abi: managerAbi,
-        functionName: "treasuryBalance",
+        functionName: "availableFunds",
         query: { refetchInterval: 15_000 },
+    });
+    const { data: factorBps } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "accountFactorBps",
+        args: [accountId!],
+        ...on,
+    });
+    const { data: cleanCycles } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "closedCleanCycles",
+        args: [accountId!],
+        ...on,
+    });
+    const { data: credit } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "creditCents",
+        args: [accountId!],
+        ...on,
     });
     const { data: feeBps } = useReadContract({ address: MANAGER_ADDRESS, abi: managerAbi, functionName: "feeBps" });
     const { data: shareBps } = useReadContract({
@@ -280,6 +302,9 @@ export default function Page() {
                 <h2>How it works</h2>
                 <Mechanism />
 
+                <h2>Lend</h2>
+                <Lend />
+
                 <h2>What this account has done</h2>
                 <ActivityFeed accountId={accountId} />
 
@@ -400,9 +425,16 @@ export default function Page() {
                     ) : (
                         <>
                             The mean of the last {averaged} attested {averaged === 1 ? "period" : "periods"} is{" "}
-                            <span className="mono">{usd(avg)}</span>. A first advance is one times that mean.
-                            Nothing else goes into it, and the inputs are stored on the advance itself so the
-                            decision can be checked afterwards.
+                            <span className="mono">{usd(avg)}</span>, and this account&apos;s earned factor is{" "}
+                            <span className="mono">
+                                {factorBps !== undefined ? `${(Number(factorBps) / 100).toFixed(2)}%` : "…"}
+                            </span>
+                            {cleanCycles !== undefined && Number(cleanCycles) > 0 && (
+                                <> after {Number(cleanCycles)} cleanly repaid advance{Number(cleanCycles) === 1 ? "" : "s"}</>
+                            )}
+                            . New accounts start at 2.5% — deliberately below card-processing fees, so faking
+                            revenue at yourself costs more than it frees — and every advance repaid in full
+                            without delinquency raises it. Every input is on chain.
                         </>
                     )}
                 </p>
@@ -487,8 +519,14 @@ export default function Page() {
                                 })()}
                             </span>
                         </div>
+                        {(credit ?? 0n) > 0n && (
+                            <div className="row">
+                                <span>Banked credit (XRPL overpayment)</span>
+                                <span className="mono">{usd(credit!)} — settles this at origination</span>
+                            </div>
+                        )}
                         <div className="row">
-                            <span>In the treasury now</span>
+                            <span>Available to lend now</span>
                             <span className="mono">
                                 {treasury === undefined
                                     ? "…"
@@ -502,9 +540,9 @@ export default function Page() {
                          */}
                         {treasuryDry && (
                             <p className="alert" style={{ marginTop: 14, marginBottom: 0 }}>
-                                The treasury is empty, so no advance can be issued right now. Everything above is
-                                live — the proven revenue, the limit and the price are all being read from chain.
-                                Funding it is a faucet claim, not a code change.
+                                No lending liquidity is available right now, so an advance cannot be issued.
+                                Everything above is live — the proven revenue, the limit and the price are read
+                                from chain — and a deposit in the Lend section below reopens originations.
                             </p>
                         )}
 
@@ -643,6 +681,9 @@ export default function Page() {
                     )}
                 </>
             )}
+
+            <h2>Lend</h2>
+            <Lend />
 
             <h2>This account&apos;s history</h2>
             <ActivityFeed accountId={accountId} />

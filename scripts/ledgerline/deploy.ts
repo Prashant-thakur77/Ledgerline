@@ -1,12 +1,12 @@
 /**
- * Deploy Ledgerline to Coston2, wire up FAssets, and fund the treasury with whatever FXRP is on hand.
- *   yarn hardhat run scripts/ledgerline/deploy.ts --network coston2
+ * Deploy Ledgerline V2 to Coston2: oracle, manager, and the lender pool, wired together.
+ *   npx hardhat run scripts/ledgerline/deploy.ts --network coston2
  *
  * Env:
- *   ORACLE_ADDRESS   reuse an existing RevenueOracle instead of deploying a new one. Set this when only
- *                    AdvanceManager has changed — the proven revenue history lives in the oracle, and
- *                    redeploying it would throw away every period already attested on chain.
+ *   ORACLE_ADDRESS   reuse an existing RevenueOracle instead of deploying. Only valid if that oracle
+ *                    already has the V2 surface (accountCreatedAt) — the manager reads it.
  *   XRPL_TREASURY_ADDRESS   the XRPL account borrowers repay to, enabling the XRPL repayment leg.
+ *   FLAT_FACTOR=1    demo mode: pin the flat 1.0x factor schedule instead of the production tiers.
  */
 import { ethers, run } from "hardhat";
 
@@ -16,12 +16,12 @@ const ASSET_MANAGER = "0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA";
 /** FDC's source id for the XRP Ledger testnet. Production would be bytes32("XRP"). */
 const XRPL_SOURCE_ID = ethers.encodeBytes32String("testXRP");
 
-async function verify(address: string, args: any[]) {
+async function verify(address: string, args: unknown[]) {
     try {
         await run("verify:verify", { address, constructorArguments: args });
         console.log("  verified");
-    } catch (e: any) {
-        console.log("  verify:", e.message.split("\n")[0]);
+    } catch (e) {
+        console.log("  verify:", (e as Error).message.split("\n")[0]);
     }
 }
 
@@ -31,8 +31,8 @@ async function main() {
     console.log("Balance :", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "C2FLR\n");
 
     /*
-     * The oracle holds every period ever proven for every account. Redeploying it silently discards that
-     * history, so reusing an existing one is the default whenever an address is supplied.
+     * The oracle holds every period ever proven. Reuse preserves that history — but only a V2 oracle can
+     * be reused, because the manager reads accountCreatedAt from it.
      */
     let oracleAddr = process.env.ORACLE_ADDRESS;
     if (oracleAddr) {
@@ -51,9 +51,16 @@ async function main() {
     const managerAddr = await manager.getAddress();
     console.log("AdvanceManager :", managerAddr);
 
+    const Pool = await ethers.getContractFactory("LenderPool");
+    const pool = await Pool.deploy(FXRP);
+    await pool.waitForDeployment();
+    const poolAddr = await pool.getAddress();
+    console.log("LenderPool     :", poolAddr);
+
+    await (await pool.setManager(managerAddr)).wait();
+    await (await manager.setPool(poolAddr)).wait();
     await (await manager.setAssetManager(ASSET_MANAGER)).wait();
 
-    // The XRPL account borrowers repay to. Without it, repayFromXrpl refuses to run at all.
     const xrplTreasury = process.env.XRPL_TREASURY_ADDRESS;
     if (xrplTreasury) {
         await (await manager.setXrplTreasury(xrplTreasury, XRPL_SOURCE_ID)).wait();
@@ -61,37 +68,31 @@ async function main() {
     } else {
         console.log("XRPL treasury  : unset — the XRPL repayment leg is unavailable");
     }
-    const fxrp = await ethers.getContractAt(
-        [
-            "function approve(address,uint256) returns (bool)",
-            "function decimals() view returns (uint8)",
-            "function balanceOf(address) view returns (uint256)",
-        ],
-        FXRP
-    );
-    const dec = await fxrp.decimals();
-    console.log("Lot size       :", ethers.formatUnits(await manager.lotSize(), dec), "XRP");
+
+    if (process.env.FLAT_FACTOR === "1") {
+        await (await manager.setFactorSchedule(10_000, 0, 10_000, 0)).wait();
+        console.log("Factor         : flat 1.0x (demo mode)");
+    } else {
+        console.log("Factor         : tiered — 2.5% base, +20pts/clean cycle, 1.0x cap, 30d age gate");
+    }
 
     const [price, priceDec] = await manager.currentXrpUsd.staticCall();
     console.log("XRP/USD        : $" + Number(price) / 10 ** Number(priceDec));
-
-    const balance = await fxrp.balanceOf(deployer.address);
-    if (balance > 0n) {
-        console.log(`\nFunding treasury with ${ethers.formatUnits(balance, dec)} FXRP...`);
-        await (await fxrp.approve(managerAddr, balance)).wait();
-        await (await manager.depositTreasury(balance)).wait();
-        console.log("Treasury:", ethers.formatUnits(await manager.treasuryBalance(), dec), "FXRP");
-    } else {
-        console.log("\nNo FXRP held — treasury left empty. Claim from the faucet, then run fund-treasury.ts.");
-    }
+    console.log("Lot size       :", ethers.formatUnits(await manager.lotSize(), 6), "XRP");
 
     console.log("\nVerifying on the explorer...");
     await verify(oracleAddr, []);
     await verify(managerAddr, [oracleAddr, FXRP]);
+    await verify(poolAddr, [FXRP]);
+
+    console.log("\nFund the pool as the first LP:");
+    console.log("  approve FXRP to the pool, then pool.deposit(amount, you)");
+    console.log("  or: POOL_ADDRESS=" + poolAddr + " npx hardhat run scripts/ledgerline/fund-pool.ts --network coston2");
 
     console.log("\n--- deployed ---");
     console.log("ORACLE_ADDRESS=" + oracleAddr);
     console.log("MANAGER_ADDRESS=" + managerAddr);
+    console.log("POOL_ADDRESS=" + poolAddr);
 }
 
 void main().then(() => process.exit(0));

@@ -23,8 +23,11 @@ const FILES = ["README.md", "docs/DEPLOYED.md", "docs/DEMO.md", "docs/PHASE0.md"
  * bare hex string for them — which reads like something is wrong when nothing is.
  */
 const NAMED: Record<string, string> = {
-    "0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6": "RevenueOracle",
-    "0x63fC5a5c422D40DcC8FA267384BA5351d8698A58": "AdvanceManager",
+    "0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6": "RevenueOracle",
+    "0xD397f88C6466C0F202b5387454d2897762FDE054": "AdvanceManager",
+    "0x815337Dd052544b228b11A192Fe108F9482441f6": "LenderPool",
+    "0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6": "RevenueOracle (superseded)",
+    "0x63fC5a5c422D40DcC8FA267384BA5351d8698A58": "AdvanceManager (superseded)",
     "0x4EC83Eb966dcac3e4291c85320Cfd6941a7C4f66": "AdvanceManager (superseded)",
     "0x5774E51335277893c5f177bb6735b4CF2fE76A63": "AdvanceManager (superseded)",
     "0x47C6d20206AbD9413d345d45c65aB8a074Ca28a8": "RevenueOracle (superseded)",

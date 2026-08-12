@@ -28,8 +28,8 @@ import { prepareAttestationRequestBase, submitAttestationRequest, retrieveDataAn
 
 const { VERIFIER_URL_TESTNET, VERIFIER_API_KEY_TESTNET, COSTON2_DA_LAYER_URL } = process.env;
 
-const MANAGER_ADDRESS = process.env.MANAGER_ADDRESS ?? "0x63fC5a5c422D40DcC8FA267384BA5351d8698A58";
-const ORACLE_ADDRESS = process.env.ORACLE_ADDRESS ?? "0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6";
+const MANAGER_ADDRESS = process.env.MANAGER_ADDRESS ?? "0xD397f88C6466C0F202b5387454d2897762FDE054";
+const ORACLE_ADDRESS = process.env.ORACLE_ADDRESS ?? "0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6";
 const PLATFORM = process.env.PLATFORM ?? "stripe";
 const ACCOUNT_REF = process.env.ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
 const XRP_AMOUNT = process.env.XRP_AMOUNT ?? "5";

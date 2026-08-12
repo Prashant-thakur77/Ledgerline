@@ -97,8 +97,8 @@ smart contracts of its own.
 > The contracts were then redeployed. The five above remain exactly what happened; they simply predate that
 > field.
 
-The current `RevenueOracle` at [`0x80D08369…`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code)
-holds two periods, both attested from live Stripe API calls:
+That generation's `RevenueOracle` at [`0x80D08369…`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code)
+holds the periods attested from live Stripe API calls:
 
 | Period ending | Proven | FDC round | Merkle root | |
 |---|---|---|---|---|
@@ -110,7 +110,7 @@ attestation, not a second month of trading. That run was timed end to end at **1
 
 ### The loop closes: funded in real XRP, repaid in real XRP
 
-Run against the current [`AdvanceManager`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code).
+Run against the then-current [`AdvanceManager`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code), since superseded by V2 below.
 Money leaves Flare for the XRP Ledger through FAssets, and comes back through a second FDC attestation type.
 **No FXRP, and no EVM asset, is held by the borrower at any point in either direction.**
 
@@ -168,10 +168,23 @@ document that claims more than the chain can support.
 
 ## Deployed on Coston2 (chain id 114)
 
+**V2 — current.** Adds the attack-resistant underwriting (tier schedule below card fees, non-overlapping
+periods, attested account age), the ERC-4626 lender pool, pause-on-originations, write-offs, batched XRPL
+repayment, sender binding and overpayment credit. The first period is already proven on it from a live
+Stripe call: [`0xcada3fee…`](https://coston2-explorer.flare.network/tx/0xcada3fee00b508a3abfa01cd51b73da1c0f66aea7b41863563c10c263d18ea41).
+
 | Contract | Address |
 |---|---|
-| `RevenueOracle` | [`0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code) |
-| `AdvanceManager` | [`0x63fC5a5c422D40DcC8FA267384BA5351d8698A58`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code) |
+| `RevenueOracle` | [`0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6`](https://coston2-explorer.flare.network/address/0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6#code) |
+| `AdvanceManager` | [`0xD397f88C6466C0F202b5387454d2897762FDE054`](https://coston2-explorer.flare.network/address/0xD397f88C6466C0F202b5387454d2897762FDE054#code) |
+| `LenderPool` (ERC-4626) | [`0x815337Dd052544b228b11A192Fe108F9482441f6`](https://coston2-explorer.flare.network/address/0x815337Dd052544b228b11A192Fe108F9482441f6#code) |
+
+Superseded generations, kept because the evidence above ran on them:
+
+| Contract | Address |
+|---|---|
+| `RevenueOracle` (v1) | [`0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6`](https://coston2-explorer.flare.network/address/0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6#code) |
+| `AdvanceManager` (v1) | [`0x63fC5a5c422D40DcC8FA267384BA5351d8698A58`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code) |
 | XRPL treasury (repayments arrive here) | [`r9aTnFEPnSceeGjDgcbhqsK3epizmZGC2o`](https://testnet.xrpl.org/accounts/r9aTnFEPnSceeGjDgcbhqsK3epizmZGC2o) |
 | FAssets `AssetManager` (FXRP) | [`0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`](https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA) |
 | FXRP (`FTestXRP`) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |

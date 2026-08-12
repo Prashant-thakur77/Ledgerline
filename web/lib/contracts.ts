@@ -1,5 +1,6 @@
-export const ORACLE_ADDRESS = "0x80D08369E1a34e8c7C43FCF947323e56e6B87Be6" as const;
-export const MANAGER_ADDRESS = "0x63fC5a5c422D40DcC8FA267384BA5351d8698A58" as const;
+export const ORACLE_ADDRESS = "0x4Ef13AC54c1306F2E678e201b9CB4f9e1C1AB4b6" as const;
+export const MANAGER_ADDRESS = "0xD397f88C6466C0F202b5387454d2897762FDE054" as const;
+export const POOL_ADDRESS = "0x815337Dd052544b228b11A192Fe108F9482441f6" as const;
 export const FXRP_ADDRESS = "0x0b6A3645c240605887a5532109323A3E12273dc7" as const;
 
 export const EXPLORER = "https://coston2-explorer.flare.network";
@@ -9,7 +10,7 @@ export const EXPLORER = "https://coston2-explorer.flare.network";
  * will refuse, or take a very long time over, a range covering the whole chain, and nothing this app cares
  * about happened before its own deployment.
  */
-export const DEPLOY_BLOCK = 33_798_869n;
+export const DEPLOY_BLOCK = 33_973_977n;
 
 export const oracleAbi = [
     {
@@ -174,6 +175,123 @@ export const managerAbi = [
             { name: "price", type: "uint256" },
             { name: "priceDecimals", type: "int8" },
         ],
+        outputs: [{ type: "uint256" }],
+    },
+    /** The factor this account has earned under the tier schedule — every input to it is on chain. */
+    {
+        type: "function",
+        name: "accountFactorBps",
+        stateMutability: "view",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [{ type: "uint16" }],
+    },
+    {
+        type: "function",
+        name: "closedCleanCycles",
+        stateMutability: "view",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [{ type: "uint32" }],
+    },
+    /** Banked overpayment from XRPL repayments; the next advance consumes it at origination. */
+    {
+        type: "function",
+        name: "creditCents",
+        stateMutability: "view",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [{ type: "uint256" }],
+    },
+    /** What can fund an advance right now — pool liquidity in pool mode, the owner treasury otherwise. */
+    {
+        type: "function",
+        name: "availableFunds",
+        stateMutability: "view",
+        inputs: [],
+        outputs: [{ type: "uint256" }],
+    },
+] as const;
+
+/** The lender side: the ERC-4626 vault the app reads and LPs act on. */
+export const poolAbi = [
+    { type: "function", name: "totalAssets", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+    { type: "function", name: "lentFxrp", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+    {
+        type: "function",
+        name: "availableToLend",
+        stateMutability: "view",
+        inputs: [],
+        outputs: [{ type: "uint256" }],
+    },
+    {
+        type: "function",
+        name: "balanceOf",
+        stateMutability: "view",
+        inputs: [{ name: "owner", type: "address" }],
+        outputs: [{ type: "uint256" }],
+    },
+    {
+        type: "function",
+        name: "convertToAssets",
+        stateMutability: "view",
+        inputs: [{ name: "shares", type: "uint256" }],
+        outputs: [{ type: "uint256" }],
+    },
+    {
+        type: "function",
+        name: "maxWithdraw",
+        stateMutability: "view",
+        inputs: [{ name: "owner", type: "address" }],
+        outputs: [{ type: "uint256" }],
+    },
+    {
+        type: "function",
+        name: "deposit",
+        stateMutability: "nonpayable",
+        inputs: [
+            { name: "assets", type: "uint256" },
+            { name: "receiver", type: "address" },
+        ],
+        outputs: [{ type: "uint256" }],
+    },
+    {
+        type: "function",
+        name: "withdraw",
+        stateMutability: "nonpayable",
+        inputs: [
+            { name: "assets", type: "uint256" },
+            { name: "receiver", type: "address" },
+            { name: "owner", type: "address" },
+        ],
+        outputs: [{ type: "uint256" }],
+    },
+] as const;
+
+/** ERC-20 surface the lend flow needs: approve the pool, read the wallet's FXRP. */
+export const erc20Abi = [
+    {
+        type: "function",
+        name: "approve",
+        stateMutability: "nonpayable",
+        inputs: [
+            { name: "spender", type: "address" },
+            { name: "amount", type: "uint256" },
+        ],
+        outputs: [{ type: "bool" }],
+    },
+    {
+        type: "function",
+        name: "allowance",
+        stateMutability: "view",
+        inputs: [
+            { name: "owner", type: "address" },
+            { name: "spender", type: "address" },
+        ],
+        outputs: [{ type: "uint256" }],
+    },
+    {
+        type: "function",
+        name: "balanceOf",
+        stateMutability: "view",
+        inputs: [{ name: "owner", type: "address" }],
         outputs: [{ type: "uint256" }],
     },
 ] as const;
