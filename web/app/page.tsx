@@ -125,7 +125,7 @@ export default function Landing() {
 
                         <Reveal delay={180}>
                             <div className="stats">
-                                <Stat value={129} label="automated tests, all passing" />
+                                <Stat value={136} label="automated tests, all passing" />
                                 <Stat value={2} label="FDC attestation types, both load-bearing" />
                                 <Stat value={116} suffix="s" label="measured, request to verified on chain" />
                                 <Stat value={0} label="keys this site holds" />

@@ -46,7 +46,7 @@ async function main() {
             "function feeBps() view returns (uint16)",
             "function repaymentShareBps() view returns (uint16)",
             "function lotSize() view returns (uint256)",
-            "function currentXrpUsd() returns (uint256,int8)",
+            "function currentXrpUsd() returns (uint256,int8,uint64)",
         ],
         provider
     );

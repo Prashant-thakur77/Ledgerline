@@ -214,8 +214,12 @@ code {
     padding: 0 var(--gutter);
 }
 
+/*
+ * Section rhythm. 128px top and bottom meant 256px of empty ground between every pair of sections on a
+ * large display, which stops reading as air and starts reading as a page that has not finished loading.
+ */
 .landing section {
-    padding: clamp(64px, 11vw, 128px) 0;
+    padding: clamp(56px, 7.5vw, 100px) 0;
 }
 
 .landing section + section {
@@ -1781,24 +1785,26 @@ h2::after {
     border-color: rgba(230, 32, 88, 0.35);
 }
 
+/*
+ * Four equal cells. An earlier version gave the first stat three columns of six, which left the other
+ * three at a sixth of the width each — narrow enough that their labels broke to three lines and the row
+ * read as a layout bug rather than a hierarchy. Emphasis now comes from treatment (a lit ground, a larger
+ * figure), which is what was actually wanted, and every label gets room to sit on two lines at most.
+ */
 @media (min-width: 741px) {
     .stats {
-        grid-template-columns: repeat(6, 1fr);
-    }
-
-    .stats > * {
-        grid-column: span 1;
+        grid-template-columns: repeat(4, 1fr);
     }
 
     .stats > :first-child {
-        grid-column: span 3;
         background:
             radial-gradient(30rem 16rem at 8% 0%, rgba(230, 32, 88, 0.09), transparent 60%),
             linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012));
+        border-color: rgba(230, 32, 88, 0.22);
     }
 
     .stats > :first-child .stat-value {
-        font-size: clamp(40px, 5.6vw, 58px);
+        font-size: clamp(38px, 4.6vw, 52px);
     }
 }
 

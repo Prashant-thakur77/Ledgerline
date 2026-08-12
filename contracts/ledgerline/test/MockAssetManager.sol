@@ -18,9 +18,17 @@ contract MockAssetManager {
     uint256 public lastLots;
     string public lastUnderlyingAddress;
 
+    /// @dev How much of a redemption the available agents can actually fill. The real AssetManager fills
+    /// from whatever capacity exists and returns what it managed, so a short fill has to be expressible.
+    uint16 public fillRatioBps = 10_000;
+
     constructor(address _fasset, uint256 _lot) {
         fasset = IERC20(_fasset);
         lot = _lot;
+    }
+
+    function setFillRatioBps(uint16 bps) external {
+        fillRatioBps = bps;
     }
 
     function lotSize() external view returns (uint256) {
@@ -34,7 +42,7 @@ contract MockAssetManager {
     ) external payable returns (uint256) {
         lastLots = _lots;
         lastUnderlyingAddress = _redeemerUnderlyingAddressString;
-        uint256 amount = _lots * lot;
+        uint256 amount = (_lots * lot * fillRatioBps) / 10_000;
         fasset.transferFrom(msg.sender, address(this), amount);
         return amount;
     }

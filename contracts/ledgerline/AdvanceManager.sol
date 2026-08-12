@@ -102,6 +102,22 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     uint256 public maxAdvanceCents = 10_000_000; // $100,000 hard cap
     uint64 public gracePeriod = 45 days;
 
+    /**
+     * @notice The outside date on an advance. Revenue-based finance is not open-ended credit: the money
+     * is advanced against a few months of earnings and is expected back on that timescale. This is also
+     * what stops a token repayment every grace period from keeping a balance open indefinitely.
+     */
+    uint64 public maxTermSeconds = 180 days;
+
+    /**
+     * @notice How stale the XRP/USD feed may be before this contract refuses to price anything.
+     * FTSOv2 publishes roughly every 90 seconds, so an hour is ~40 missed updates: comfortably wide enough
+     * never to fire in normal operation, narrow enough that a genuinely broken feed cannot mis-size an
+     * advance. Repayments refuse too — pricing a repayment off a stale feed cheats whichever side the
+     * price moved against.
+     */
+    uint64 public maxPriceAge = 1 hours;
+
     /// @notice Advances repaid in full without ever being marked delinquent. The account's reputation.
     mapping(bytes32 => uint32) public closedCleanCycles;
 
@@ -195,6 +211,8 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     event CreditApplied(bytes32 indexed accountId, uint256 usdCents, uint256 outstandingCents);
     event RepaymentSourceBound(bytes32 indexed accountId, bytes32 xrplSenderHash);
     event XrplTreasurySet(string xrplAddress, bytes32 xrplAddressHash, bytes32 sourceId);
+    event MaxPriceAgeSet(uint64 maxPriceAge);
+    event MaxTermSet(uint64 maxTermSeconds);
     /// @notice A repayment that arrived as real XRP on the XRP Ledger and was proven by FDC.
     event RepaidFromXrpl(
         bytes32 indexed accountId,
@@ -230,6 +248,8 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     error WrongPaymentRecipient();
     error WrongPaymentReference(bytes32 expected, bytes32 got);
     error XrplPaymentAlreadyUsed(bytes32 transactionId);
+    error StalePrice(uint64 feedTimestamp, uint256 blockTimestamp);
+    error RedemptionShortfall(uint256 requested, uint256 redeemed);
 
     constructor(address oracleAddress, address fxrpAddress) Ownable(msg.sender) {
         oracle = RevenueOracle(oracleAddress);
@@ -297,8 +317,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     function requestAdvance(bytes32 accountId, uint256 usdCents) external nonReentrant whenNotPaused {
         if (usdCents == 0) revert InvalidAmount();
 
-        (uint256 price, int8 priceDecimals) = _xrpUsd();
-        if (price == 0) revert InvalidPrice();
+        (uint256 price, int8 priceDecimals) = _xrpUsdFresh();
 
         uint256 fxrpAmount = usdCentsToFxrp(usdCents, price, priceDecimals);
         if (fxrpAmount == 0) revert InvalidAmount();
@@ -311,6 +330,10 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             treasuryBalance -= fxrpAmount;
             fxrp.safeTransfer(borrower, fxrpAmount);
         }
+
+        // Only once the FXRP is actually out can credit retire it: settling the debt before the pool has
+        // booked the loan would retire principal that had not been lent yet.
+        _applyCredit(accountId, _advances[accountId]);
     }
 
     /**
@@ -335,8 +358,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
 
         uint256 fxrpAmount = lots * redeemer.lotSize();
 
-        (uint256 price, int8 priceDecimals) = _xrpUsd();
-        if (price == 0) revert InvalidPrice();
+        (uint256 price, int8 priceDecimals) = _xrpUsdFresh();
 
         uint256 usdCents = fxrpToUsdCents(fxrpAmount, price, priceDecimals);
         if (usdCents == 0) revert InvalidAmount();
@@ -350,9 +372,19 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             treasuryBalance -= fxrpAmount;
         }
         fxrp.forceApprove(address(redeemer), fxrpAmount);
-        redeemer.redeem(lots, xrplAddress, payable(address(0)));
+        /*
+         * The debt was computed from the lots asked for, so anything less actually redeemed would leave
+         * the borrower owing dollars against XRP that was never sent. FAssets fills from whatever agents
+         * have capacity and returns what it managed; a short fill is a reason to refuse the advance, not
+         * to book it and reconcile later.
+         */
+        uint256 redeemed = redeemer.redeem(lots, xrplAddress, payable(address(0)));
+        if (redeemed < fxrpAmount) revert RedemptionShortfall(fxrpAmount, redeemed);
 
         emit AdvanceDisbursedToXrpl(accountId, borrower, lots, fxrpAmount, xrplAddress);
+
+        // As in the FXRP leg: the loan has to be on the pool's books before credit can retire it.
+        _applyCredit(accountId, _advances[accountId]);
     }
 
     /**
@@ -409,8 +441,6 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             advance.xrpUsdPrice,
             advance.priceDecimals
         );
-
-        _applyCredit(accountId, advance);
     }
 
     /**
@@ -470,8 +500,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         if (!advance.open) revert NoOpenAdvance();
         if (usdCents > advance.outstandingCents) revert InvalidAmount();
 
-        (uint256 price, int8 priceDecimals) = _xrpUsd();
-        if (price == 0) revert InvalidPrice();
+        (uint256 price, int8 priceDecimals) = _xrpUsdFresh();
 
         uint256 fxrpAmount = usdCentsToFxrp(usdCents, price, priceDecimals);
         if (fxrpAmount == 0) revert InvalidAmount();
@@ -581,8 +610,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     function _repayFromXrplOne(bytes32 accountId, IPayment.Proof calldata proof) internal {
         uint256 drops = _validateXrplPayment(accountId, proof);
 
-        (uint256 price, int8 priceDecimals) = _xrpUsd();
-        if (price == 0) revert InvalidPrice();
+        (uint256 price, int8 priceDecimals) = _xrpUsdFresh();
 
         uint256 usdValue = xrpDropsToUsdCents(drops, price, priceDecimals);
         if (usdValue == 0) revert InvalidAmount();
@@ -592,9 +620,19 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
          * honoured: what the open advance can absorb settles it, and the remainder becomes credit that
          * the next advance consumes at origination.
          */
-        uint256 toDebt = _settleXrplDebt(
+        (uint256 toDebt, uint256 retired) = _settleXrplDebt(
             accountId, proof.data.requestBody.transactionId, drops, usdValue, price, priceDecimals
         );
+
+        /*
+         * Book the claim for the whole payment, whether or not a debt absorbed it. The XRP is in the
+         * operator's XRPL treasury either way, and the part that becomes credit is precisely the part that
+         * will later fund an advance out of this pool — so a payment that booked nothing would let credit
+         * spend FXRP the pool was never credited for.
+         */
+        if (address(pool) != address(0)) {
+            pool.onXrplRepayment(drops, retired);
+        }
 
         uint256 toCredit = usdValue - toDebt;
         if (toCredit > 0) {
@@ -634,7 +672,8 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         return uint256(body.receivedAmount);
     }
 
-    /// @dev Apply an attested dollar value to the open advance, if any. Returns what the debt absorbed.
+    /// @dev Apply an attested dollar value to the open advance, if any. Returns what the debt absorbed and
+    /// how much lent principal that retires — the caller books both against the pool in one place.
     function _settleXrplDebt(
         bytes32 accountId,
         bytes32 transactionId,
@@ -642,9 +681,9 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         uint256 usdValue,
         uint256 price,
         int8 priceDecimals
-    ) internal returns (uint256 toDebt) {
+    ) internal returns (uint256 toDebt, uint256 retired) {
         Advance storage advance = _advances[accountId];
-        if (!advance.open) return 0;
+        if (!advance.open) return (0, 0);
 
         toDebt = usdValue > advance.outstandingCents ? advance.outstandingCents : usdValue;
         advance.outstandingCents -= toDebt;
@@ -661,22 +700,32 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
          * No FXRP arrived here — the XRP landed on the XRP Ledger. With a pool attached, the received
          * amount books as a receivable (drops and FXRP base units are both millionths, so the mapping is
          * 1:1), which keeps the share price whole while stating the claim, until the operator re-mints
-         * the XRP through FAssets and settles it.
+         * the XRP through FAssets and settles it. The caller makes that booking.
          */
         if (address(pool) != address(0)) {
-            uint256 retired = _retire(accountId, advance, toDebt, closed);
-            pool.onXrplRepayment(drops, retired);
+            retired = _retire(accountId, advance, toDebt, closed);
         }
 
         emit RepaidFromXrpl(accountId, transactionId, drops, toDebt, price, priceDecimals, advance.outstandingCents);
         if (closed) emit AdvanceClosed(accountId);
     }
 
-    /// @notice Record that an advance has gone unserviced past the grace period.
+    /**
+     * @notice Record that an advance has gone unserviced, either way it can.
+     *
+     * Two independent triggers, because one alone is gameable. Silence past the grace period is the
+     * obvious one. The other is the term: every repayment refreshes `lastActivityAt`, so a borrower
+     * paying a single cent every forty-four days could hold a six-figure balance open forever and never
+     * be delinquent. An advance therefore also has an outside date — repay within `maxTermSeconds` of
+     * opening or the account is delinquent regardless of how diligently it has been dripping.
+     */
     function markDelinquent(bytes32 accountId) external {
         Advance storage advance = _advances[accountId];
         if (!advance.open) revert NoOpenAdvance();
-        if (block.timestamp <= advance.lastActivityAt + gracePeriod) revert GracePeriodNotElapsed();
+
+        bool wentQuiet = block.timestamp > advance.lastActivityAt + gracePeriod;
+        bool termExpired = block.timestamp > advance.openedAt + maxTermSeconds;
+        if (!wentQuiet && !termExpired) revert GracePeriodNotElapsed();
 
         advance.delinquent = true;
         emit MarkedDelinquent(accountId, advance.outstandingCents);
@@ -790,6 +839,13 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         emit RiskTermsSet(newHistoryStepBps, newRiskPremiumBps);
     }
 
+    /// @notice The outside date on an advance. Zero would mean every advance is delinquent at once.
+    function setMaxTerm(uint64 newMaxTermSeconds) external onlyOwner {
+        if (newMaxTermSeconds == 0) revert InvalidAmount();
+        maxTermSeconds = newMaxTermSeconds;
+        emit MaxTermSet(newMaxTermSeconds);
+    }
+
     function setAssetManager(address newAssetManager) external onlyOwner {
         assetManager = IFAssetRedeemer(newAssetManager);
         emit AssetManagerSet(newAssetManager);
@@ -853,14 +909,35 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
      * free, so this costs nothing today, but the mutability has to match the interface.
      * Overridden in tests so a price move can be simulated.
      */
-    function _xrpUsd() internal virtual returns (uint256 price, int8 decimals) {
-        (uint256 value, int8 dec, ) = ContractRegistry.getFtsoV2().getFeedById(XRP_USD_FEED_ID);
-        return (value, dec);
+    function _xrpUsd() internal virtual returns (uint256 price, int8 decimals, uint64 timestamp) {
+        return ContractRegistry.getFtsoV2().getFeedById(XRP_USD_FEED_ID);
     }
 
-    /// @notice The live XRP/USD the contract would use right now. Call it with eth_call from the UI.
-    function currentXrpUsd() external returns (uint256 price, int8 decimals) {
+    /**
+     * @dev Every dollar figure in this contract is converted at this price, so a stale feed does not
+     * produce a slightly wrong answer — it produces an advance sized by yesterday's XRP. FTSOv2 updates
+     * roughly every 90 seconds; anything older than `maxPriceAge` is treated as no price at all rather
+     * than quietly used. A feed timestamp ahead of the block is equally wrong and equally refused.
+     */
+    function _xrpUsdFresh() internal returns (uint256 price, int8 decimals) {
+        uint64 timestamp;
+        (price, decimals, timestamp) = _xrpUsd();
+        if (price == 0) revert InvalidPrice();
+        if (timestamp > block.timestamp) revert StalePrice(timestamp, block.timestamp);
+        if (block.timestamp - timestamp > maxPriceAge) revert StalePrice(timestamp, block.timestamp);
+    }
+
+    /// @notice The live XRP/USD the contract would use right now, with the age the freshness check sees.
+    /// Call it with eth_call from the UI.
+    function currentXrpUsd() external returns (uint256 price, int8 decimals, uint64 timestamp) {
         return _xrpUsd();
+    }
+
+    /// @notice How old the XRP/USD feed may be before advances and repayments refuse to price.
+    function setMaxPriceAge(uint64 newMaxPriceAge) external onlyOwner {
+        if (newMaxPriceAge == 0) revert InvalidAmount();
+        maxPriceAge = newMaxPriceAge;
+        emit MaxPriceAgeSet(newMaxPriceAge);
     }
 
     /**

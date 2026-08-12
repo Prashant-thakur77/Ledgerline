@@ -97,8 +97,15 @@ export function ParticleField() {
             const cy = Math.cos(spin + yaw), sy = Math.sin(spin + yaw);
             const cx = Math.cos(0.3 + pitch), sx = Math.sin(0.3 + pitch);
 
-            // Well off to the right on wide screens; centred where there is no right to speak of.
-            const cxPix = width * (width < 720 ? 0.5 : 0.78);
+            /*
+             * Well off to the right on wide screens; centred where there is no right to speak of.
+             * Pulled back far enough that the cloud's own radius still fits: at 1440px, 0.78 put its
+             * centre at 1123px and the shell reached past the edge, so the constellation read as a shape
+             * cropped by the viewport rather than one floating in it.
+             */
+            const margin = RADIUS * 1.15 + 16;
+            const cxPix =
+                width < 720 ? width * 0.5 : Math.min(width * 0.78, Math.max(width * 0.55, width - margin));
             const cyPix = height * 0.42;
 
             // Rotate and project once per frame; reuse for both passes.

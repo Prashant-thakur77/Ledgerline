@@ -64,6 +64,9 @@ export const managerAbi = [
         name: "currentXrpUsd",
         stateMutability: "nonpayable",
         inputs: [],
+        // Two outputs, matching the deployed contract. `main` adds a third (the feed's publish time, for
+        // the staleness guard); this gains the third field in the same commit that deploys it, because an
+        // ABI that promises more than the deployed bytecode returns fails to decode at all.
         outputs: [
             { name: "price", type: "uint256" },
             { name: "decimals", type: "int8" },
