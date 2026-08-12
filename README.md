@@ -1,4 +1,7 @@
-# Ledgerline
+# Proofline
+
+*(Ledgerline in the code: the contracts, scripts and package names keep the working name so nothing on
+chain or in the history has to be re-verified for a rebrand.)*
 
 **Advances against revenue your payment processor already proves.**
 
