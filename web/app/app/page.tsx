@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
     useAccount,
-    useChainId,
     useDisconnect,
     useReadContract,
     useSimulateContract,
@@ -36,10 +35,9 @@ import { Grain } from "../components/Chrome";
 const STRIPE_ACCOUNT_REF = process.env.NEXT_PUBLIC_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
 
 export default function Page() {
-    const { address, isConnected } = useAccount();
+    const { address, isConnected, chainId: walletChainId } = useAccount();
     const { disconnect } = useDisconnect();
     const { switchChain } = useSwitchChain();
-    const chainId = useChainId();
 
     // Which account the page is looking at. The Stripe account is ours and is bound to the wallet that first
     // proved it; the sandbox one belongs to whoever is connected, so a visitor can run the whole loop.
@@ -318,7 +316,7 @@ export default function Page() {
     // ------------------------------------------------------------------ connected
 
     const open = advance?.open ?? false;
-    const wrongChain = chainId !== flareTestnet.id;
+    const wrongChain = walletChainId !== undefined && walletChainId !== flareTestnet.id;
     const isBoundOwner =
         Boolean(boundOwner) &&
         boundOwner !== "0x0000000000000000000000000000000000000000" &&
@@ -350,7 +348,7 @@ export default function Page() {
             {wrongChain && (
                 <div className="block">
                     <p className="alert" style={{ margin: 0 }}>
-                        This wallet is on chain {chainId}. Ledgerline lives on Coston2, chain id {flareTestnet.id}.
+                        This wallet is on chain {walletChainId}. Ledgerline lives on Coston2, chain id {flareTestnet.id}.
                     </p>
                     <div style={{ marginTop: 12 }}>
                         <button className="wide" onClick={() => switchChain({ chainId: flareTestnet.id })}>

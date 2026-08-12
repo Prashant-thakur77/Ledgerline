@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useConnect } from "wagmi";
+import { flareTestnet } from "wagmi/chains";
 
 /**
  * Connecting a wallet, with the failures actually shown.
@@ -77,7 +78,9 @@ export function Connect({ compact = false }: { compact?: boolean }) {
         <div className={compact ? undefined : "block"}>
             <button
                 className="wide"
-                onClick={() => connector && connect({ connector })}
+                // Asking for Coston2 at connect time makes MetaMask offer to add the network itself,
+                // so a fresh wallet needs no manual RPC/chain-id form-filling at all.
+                onClick={() => connector && connect({ connector, chainId: flareTestnet.id })}
                 disabled={isPending || !connector || hasWallet === undefined}
             >
                 {hasWallet === undefined
