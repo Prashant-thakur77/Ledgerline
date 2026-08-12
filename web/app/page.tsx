@@ -9,14 +9,14 @@ import { Stat } from "./components/Stat";
 import { FlareBadge, Marquee, Grain, ScrollProgress, Aurora } from "./components/Chrome";
 
 export const metadata: Metadata = {
-    title: "Ledgerline · Prove revenue. Borrow.",
+    title: "Proofline · Prove revenue. Borrow.",
     description:
         "Prove your revenue on chain. Borrow against it. Your revenue repays it. Built on Flare.",
 };
 
 const EXPLORER = "https://coston2-explorer.flare.network";
 const XRPL = "https://testnet.xrpl.org";
-const REPO = "https://github.com/Prashant-thakur77/Ledgerline";
+const REPO = "https://github.com/Prashant-thakur77/Proofline";
 
 /**
  * The landing page.
@@ -37,7 +37,7 @@ export default function Landing() {
             <header className="siteheader">
                 <div className="siteheader-in">
                     <Link href="/" className="brand">
-                        Ledgerline
+                        Proofline
                         <span className="brand-tag">prove revenue · borrow</span>
                     </Link>
                     <nav>

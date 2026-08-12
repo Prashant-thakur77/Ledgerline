@@ -343,7 +343,7 @@ export default function Page() {
         <Grain />
         <AppHeader account={address} onDisconnect={() => disconnect()} />
         <main className="app-main">
-            <h1>Ledgerline</h1>
+            <h1>Proofline</h1>
             <div className="row" style={{ padding: 0 }}>
                 <span className="mono">
                     {platform}/{view === "stripe" ? accountRef : short(accountRef || "0x")}
@@ -356,7 +356,7 @@ export default function Page() {
             {wrongChain && (
                 <div className="block">
                     <p className="alert" style={{ margin: 0 }}>
-                        This wallet is on chain {walletChainId}. Ledgerline lives on Coston2, chain id {flareTestnet.id}.
+                        This wallet is on chain {walletChainId}. Proofline lives on Coston2, chain id {flareTestnet.id}.
                     </p>
                     <div style={{ marginTop: 12 }}>
                         <button className="wide" onClick={() => switchChain({ chainId: flareTestnet.id })}>

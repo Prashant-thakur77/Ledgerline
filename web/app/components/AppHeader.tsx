@@ -19,7 +19,7 @@ export function AppHeader({
         <header className="appheader">
             <div className="appheader-in">
                 <Link href="/" className="brand">
-                    Ledgerline
+                    Proofline
                 </Link>
                 <div className="appheader-right">
                     {account ? (

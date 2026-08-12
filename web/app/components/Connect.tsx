@@ -62,7 +62,7 @@ export function Connect({ compact = false }: { compact?: boolean }) {
                     No Ethereum wallet found in this browser.
                 </p>
                 <p className="quiet" style={{ marginBottom: 0 }}>
-                    Ledgerline needs one to sign transactions. It never signs on your behalf. Install{" "}
+                    Proofline needs one to sign transactions. It never signs on your behalf. Install{" "}
                     <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">
                         MetaMask
                     </a>{" "}
