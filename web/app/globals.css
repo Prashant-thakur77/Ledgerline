@@ -1808,9 +1808,15 @@ h2::after {
     }
 }
 
-/* Scroll-telling: the mechanism steps sleep until the reader reaches them. */
+/*
+ * Scroll-telling: the mechanism steps sleep until the reader reaches them.
+ *
+ * They sleep at 0.66, not 0.45. This list is the explanation of how the product works and on the app page
+ * it is reference material someone scans rather than a story they scroll through — at 0.45 every step but
+ * one was too faint to read, which made a legibility problem out of what should only be emphasis.
+ */
 .mechanism li {
-    opacity: 0.45;
+    opacity: 0.66;
     transition: opacity 400ms var(--ease), transform 400ms var(--ease);
 }
 

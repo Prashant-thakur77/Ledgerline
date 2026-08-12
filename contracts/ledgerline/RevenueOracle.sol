@@ -51,6 +51,21 @@ contract RevenueOracle {
     /// @notice When the platform says the account was created. Zero until a profile attestation lands.
     mapping(bytes32 => uint64) public accountCreatedAt;
 
+    /**
+     * @notice What a period is allowed to be, in seconds.
+     *
+     * The window an attestation covers is a date range in the processor's API query, chosen by whoever
+     * builds the FDC request — the network agrees on what the API returned for that window, not on whether
+     * the window was reasonable. Underwriting treats each stored record as one month's takings, so without
+     * a bound here a single honest attestation covering a year would be priced as a month: the same real
+     * business, every figure genuine, borrowing an order of magnitude beyond the policy.
+     *
+     * The range spans every real calendar month with room to spare, and nothing else. Longer history is
+     * imported the honest way — as more periods, one per month, which cannot overlap.
+     */
+    uint64 public constant MIN_PERIOD_SECONDS = 26 days;
+    uint64 public constant MAX_PERIOD_SECONDS = 32 days;
+
     /// @notice Wallet rotation must survive a visible waiting period, so a key thief's transfer can be
     /// seen and cancelled by the real owner before it lands.
     uint64 public constant REBIND_DELAY = 3 days;
@@ -81,6 +96,7 @@ contract RevenueOracle {
     error InvalidProof();
     error AccountMismatch(bytes32 claimed, bytes32 attested);
     error InvalidPeriod();
+    error InvalidPeriodLength(uint64 span, uint64 minSeconds, uint64 maxSeconds);
     error AttestationAlreadyUsed();
     error NotAccountOwner(address owner, address caller);
     error StalePeriod(uint64 latestPeriodEnd, uint64 submittedPeriodEnd);
@@ -111,6 +127,11 @@ contract RevenueOracle {
         if (accountId != claimedAccountId) revert AccountMismatch(claimedAccountId, accountId);
 
         if (dto.periodEnd <= dto.periodStart || dto.periodEnd > type(uint64).max) revert InvalidPeriod();
+
+        uint256 span = dto.periodEnd - dto.periodStart;
+        if (span < MIN_PERIOD_SECONDS || span > MAX_PERIOD_SECONDS) {
+            revert InvalidPeriodLength(uint64(span), MIN_PERIOD_SECONDS, MAX_PERIOD_SECONDS);
+        }
 
         bytes32 attestationKey = keccak256(proof.data.responseBody.abiEncodedData);
         if (attestationUsed[attestationKey]) revert AttestationAlreadyUsed();

@@ -23,7 +23,11 @@ const VERIFIER_API_KEY = process.env.VERIFIER_API_KEY_TESTNET ?? "00000000-0000-
  */
 const STRIPE_ACCOUNT_REF = process.env.LEDGERLINE_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
 
-const MONTH = 30 * 24 * 60 * 60;
+const DAY = 24 * 60 * 60;
+const MONTH = 30 * DAY;
+/** Mirrors RevenueOracle.MIN_PERIOD_SECONDS / MAX_PERIOD_SECONDS. */
+const MIN_PERIOD = 26 * DAY;
+const MAX_PERIOD = 32 * DAY;
 
 type Body = {
     source?: "stripe" | "demo";
@@ -38,6 +42,21 @@ function buildSource(body: Body): { source: SourceConfig; window: Window } {
     const periodStart = Math.floor(Number(body.periodStart ?? periodEnd - MONTH));
     if (!Number.isFinite(periodStart) || !Number.isFinite(periodEnd) || periodEnd <= periodStart) {
         throw new Error("periodEnd must be a finite unix time after periodStart");
+    }
+
+    /*
+     * RevenueOracle only accepts a period that is actually a month, because the underwriting prices each
+     * one as a month's takings. Checking it here as well is not redundant: the contract is the enforcement
+     * point, but finding out there costs a voting round and an attestation fee, and the error arrives two
+     * minutes after the request instead of before it.
+     */
+    const span = periodEnd - periodStart;
+    if (span < MIN_PERIOD || span > MAX_PERIOD) {
+        throw new Error(
+            `A period has to be about a month: this one is ${Math.round(span / DAY)} days, and the ` +
+                `contract accepts ${MIN_PERIOD / DAY}–${MAX_PERIOD / DAY}. Longer history is proven as ` +
+                `several monthly periods, which is why they are not allowed to overlap.`
+        );
     }
 
     if (body.source === "stripe") {
