@@ -3,10 +3,11 @@ import type { Metadata } from "next";
 import { Mechanism } from "./components/Mechanism";
 import { LiveProof } from "./components/LiveProof";
 import { Tilt } from "./components/Tilt";
-import { ParticleField } from "./components/ParticleField";
+import { PulseLine } from "./components/PulseLine";
+import { HeroStrip } from "./components/HeroStrip";
 import { Reveal } from "./components/Reveal";
 import { Stat } from "./components/Stat";
-import { FlareBadge, Marquee, Grain, ScrollProgress, Aurora, CardGrid, MaskedWords } from "./components/Chrome";
+import { FlareBadge, Marquee, Grain, ScrollProgress, CardGrid, MaskedWords } from "./components/Chrome";
 
 export const metadata: Metadata = {
     title: "Proofline · Prove revenue. Borrow.",
@@ -56,44 +57,44 @@ export default function Landing() {
             <main className="landing">
                 {/* ---------------------------------------------------------------- hero */}
                 <section className="hero">
-                    <Aurora />
-                    <ParticleField />
+                    <PulseLine />
                     <div className="shell hero-in">
                         <Reveal>
-                            <FlareBadge />
+                            <p className="eyebrow">Flare Summer Signal — live on Coston2</p>
                         </Reveal>
                         <Reveal delay={70}>
-                            <h1 style={{ marginTop: 26 }}>
-                                <MaskedWords text="Borrow against revenue you can prove." grad="you can prove." />
+                            {/* Two lines, one voice: the first in white, the turn of the sentence in grey. */}
+                            <h1>
+                                <MaskedWords text="Prove revenue." />
+                                <br />
+                                <span className="grad">
+                                    <MaskedWords text="Borrow against it." />
+                                </span>
                             </h1>
                         </Reveal>
-                        <Reveal delay={140}>
-                            <p className="lede narrow">
-                                Your payment processor already knows you earn four thousand dollars a month.
-                                No lender can read it, so no lender will price it.
-                            </p>
-                        </Reveal>
-                        <Reveal delay={200}>
-                            <p className="narrow">
-                                Flare&apos;s Data Connector reads it instead. It calls the API, the
-                                network&apos;s own data providers agree on the answer, and the figure arrives
-                                on chain with a Merkle proof, proven the way a price feed is proven. Nobody
-                                vouches for it. There is nobody to bribe.
-                            </p>
-                        </Reveal>
-                        <Reveal delay={260}>
-                            <div className="cta">
-                                <Link href="/app" className="btn">
-                                    Open the app →
-                                </Link>
-                                <a className="btn ghost-btn" href="#how">
-                                    See how it works
-                                </a>
-                            </div>
-                            <p className="quiet" style={{ marginTop: 22 }}>
-                                Live on Coston2 testnet. You can run a real FDC attestation yourself. No
-                                Stripe account needed.
-                            </p>
+                        <div className="hero-cols">
+                            <Reveal delay={160}>
+                                <p className="lede narrow" style={{ marginBottom: 0 }}>
+                                    Your payment processor already knows what you earn. No lender can read
+                                    it, so no lender will price it. Flare&apos;s Data Connector reads it
+                                    instead — the network&apos;s own providers agree on the figure, and it
+                                    lands on chain with a Merkle proof. Nobody vouches for it. There is
+                                    nobody to bribe.
+                                </p>
+                            </Reveal>
+                            <Reveal delay={240}>
+                                <div className="cta" style={{ marginTop: 0 }}>
+                                    <Link href="/app" className="btn">
+                                        Open the app
+                                    </Link>
+                                    <a className="btn ghost-btn" href="#how">
+                                        How it works
+                                    </a>
+                                </div>
+                            </Reveal>
+                        </div>
+                        <Reveal delay={320}>
+                            <HeroStrip />
                         </Reveal>
                     </div>
                 </section>
