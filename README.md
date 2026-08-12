@@ -138,6 +138,22 @@ Ledger it has to be a single memo of exactly 32 bytes. The memo on that payment 
 Flare treasury would put a number in storage that no balance backs. Returning that value means minting FXRP
 from the received XRP through FAssets, which is the production answer and is not built here.
 
+### And the rest of that debt repaid itself
+
+The $5.51 left over was settled the product's own way: a newly proven period triggered the repayment, with
+nobody deciding to pay. Run against the current contracts.
+
+| | |
+|---|---|
+| A third period proven from a live Stripe call, FDC round **1,423,476** | [`0x960552ad…`](https://coston2-explorer.flare.network/tx/0x960552ad25023f6ecc01395a60d5a8227164de9a0f6aada3633fbb62fe1a40f8) |
+| `applyRevenueRepayment` took the agreed share, priced at $1.015481 | [`0x00d740b7…`](https://coston2-explorer.flare.network/tx/0x00d740b78e9c84b4cb6b434c560fb44d9c8f00c00c29b288eecc4960841f067e) |
+| Owed | **$5.51 → $0** · advance closed |
+
+So the one advance issued on the current deployment was repaid through **both** channels the product has:
+first from the XRP Ledger with an FDC Payment proof, then the remainder automatically from newly attested
+revenue. The treasury holds ~9.4 FXRP and the demo account is clean — connect a wallet and the full loop is
+open to anyone.
+
 ### Checking these claims
 
 Every transaction linked in this README and in `docs/` can be checked against the chain in one command:
