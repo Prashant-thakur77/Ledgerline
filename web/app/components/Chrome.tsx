@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect } from "react";
 
 /**
  * Small shared furniture: the Flare attribution, the protocol ticker, and the grain overlay.
@@ -58,4 +59,24 @@ export function Marquee() {
 /** A film of noise over the whole page, so the large dark areas have texture instead of banding. */
 export function Grain() {
     return <div className="grain" aria-hidden="true" />;
+}
+
+/** A hairline of the brand gradient tracking scroll depth. Passive listener, transform-only. */
+export function ScrollProgress() {
+    useEffect(() => {
+        const onScroll = () => {
+            const max = document.documentElement.scrollHeight - window.innerHeight;
+            const p = max > 0 ? window.scrollY / max : 0;
+            document.documentElement.style.setProperty("--scroll-p", String(Math.min(p, 1)));
+        };
+        onScroll();
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => window.removeEventListener("scroll", onScroll);
+    }, []);
+    return <div className="scrollbar-progress" aria-hidden="true" />;
+}
+
+/** Two slow washes of the brand gradient drifting behind the hero, under the particles. Pure CSS. */
+export function Aurora() {
+    return <div className="aurora" aria-hidden="true" />;
 }

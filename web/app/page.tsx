@@ -5,7 +5,7 @@ import { LiveProof } from "./components/LiveProof";
 import { ParticleField } from "./components/ParticleField";
 import { Reveal } from "./components/Reveal";
 import { Stat } from "./components/Stat";
-import { FlareBadge, Marquee, Grain } from "./components/Chrome";
+import { FlareBadge, Marquee, Grain, ScrollProgress, Aurora } from "./components/Chrome";
 
 export const metadata: Metadata = {
     title: "Ledgerline — borrow against revenue you can prove",
@@ -31,6 +31,7 @@ export default function Landing() {
     return (
         <>
             <Grain />
+            <ScrollProgress />
 
             <header className="siteheader">
                 <div className="siteheader-in">
@@ -53,6 +54,7 @@ export default function Landing() {
             <main className="landing">
                 {/* ---------------------------------------------------------------- hero */}
                 <section className="hero">
+                    <Aurora />
                     <ParticleField />
                     <div className="shell hero-in">
                         <Reveal>
