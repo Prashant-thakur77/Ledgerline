@@ -23,12 +23,10 @@ import {
 } from "@/lib/contracts";
 import Link from "next/link";
 import { ProofLine, short } from "../components/ProofLine";
-import { Mechanism } from "../components/Mechanism";
 import { ProveRevenue } from "../components/ProveRevenue";
 import { Connect } from "../components/Connect";
 import { ProtocolStrip, ActivityFeed } from "../components/Activity";
 import { Journey } from "../components/Journey";
-import { Lend } from "../components/Lend";
 import { AppHeader } from "../components/AppHeader";
 import { Grain } from "../components/Chrome";
 
@@ -313,12 +311,6 @@ export default function Page() {
 
                 <h2>What this account has done</h2>
                 <ActivityFeed accountId={accountId} />
-
-                <h2>Lend</h2>
-                <Lend />
-
-                <h2>How it works</h2>
-                <Mechanism />
             </main>
             </>
         );
@@ -698,34 +690,9 @@ export default function Page() {
                 </>
             )}
 
-            <h2>Lend</h2>
-            <Lend />
-
             <h2>This account&apos;s history</h2>
             <ActivityFeed accountId={accountId} />
 
-            <h2>How it works</h2>
-            <Mechanism />
-
-            <h2>Contracts</h2>
-            <div className="block">
-                <div className="row">
-                    <span>RevenueOracle</span>
-                    <a className="mono" href={`${EXPLORER}/address/${ORACLE_ADDRESS}#code`} target="_blank" rel="noreferrer">
-                        {short(ORACLE_ADDRESS)} ↗
-                    </a>
-                </div>
-                <div className="row">
-                    <span>AdvanceManager</span>
-                    <a className="mono" href={`${EXPLORER}/address/${MANAGER_ADDRESS}#code`} target="_blank" rel="noreferrer">
-                        {short(MANAGER_ADDRESS)} ↗
-                    </a>
-                </div>
-                <p className="quiet" style={{ marginTop: 12, marginBottom: 0 }}>
-                    Both are source-verified on the Coston2 explorer. Every figure on this page is read from them
-                    directly; nothing is cached or served from a database.
-                </p>
-            </div>
         </main>
         </>
     );

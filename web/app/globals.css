@@ -317,6 +317,39 @@ code {
     gap: 14px;
 }
 
+/* The app's map: three rooms, named in the mono, the current one lit. */
+.apptabs {
+    display: flex;
+    gap: 4px;
+}
+
+.apptab {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--ink-dim);
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    transition: color 160ms var(--ease), border-color 160ms var(--ease);
+}
+
+.apptab:hover {
+    color: var(--ink);
+}
+
+.apptab.active {
+    color: var(--ink);
+    border-color: var(--hairline-firm);
+}
+
+@media (max-width: 640px) {
+    .appheader-right .quiet {
+        display: none;
+    }
+}
+
 /* ---------------------------------------------------------------- buttons */
 
 /*
