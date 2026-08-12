@@ -51,6 +51,13 @@ contract RevenueOracle {
     /// @notice When the platform says the account was created. Zero until a profile attestation lands.
     mapping(bytes32 => uint64) public accountCreatedAt;
 
+    /// @notice Wallet rotation must survive a visible waiting period, so a key thief's transfer can be
+    /// seen and cancelled by the real owner before it lands.
+    uint64 public constant REBIND_DELAY = 3 days;
+
+    mapping(bytes32 => address) public pendingNewOwner;
+    mapping(bytes32 => uint64) public rebindReadyAt;
+
     mapping(bytes32 => RevenueRecord[]) private _history;
 
     /// @notice Keyed on the attested response bytes, so one attestation can never be consumed twice.
@@ -58,6 +65,9 @@ contract RevenueOracle {
 
     event AccountBound(bytes32 indexed accountId, address indexed owner, string platform);
     event ProfileProven(bytes32 indexed accountId, uint64 createdAt, uint64 votingRound);
+    event RebindRequested(bytes32 indexed accountId, address indexed newOwner, uint64 readyAt);
+    event RebindCancelled(bytes32 indexed accountId);
+    event RebindFinalized(bytes32 indexed accountId, address indexed oldOwner, address indexed newOwner);
     event RevenueProven(
         bytes32 indexed accountId,
         address indexed owner,
@@ -78,6 +88,9 @@ contract RevenueOracle {
     error NoRevenueProven();
     error ProfileAlreadySet(bytes32 accountId);
     error InvalidProfile();
+    error NoRebindPending(bytes32 accountId);
+    error RebindNotReady(uint64 readyAt, uint256 nowTs);
+    error RebindToZero();
 
     /// @notice Account identity is derived from the attested payload, so it cannot be spoofed by the caller.
     function accountIdFor(string memory platform, string memory accountRef) public pure returns (bytes32) {
@@ -177,6 +190,52 @@ contract RevenueOracle {
 
     /// @dev Present so the profile DTO lands in the ABI for the attestation script to encode against.
     function profileAbiSignatureHack(ProfileDTO calldata dto) external pure {}
+
+    // ---------------------------------------------------------------- wallet rotation
+
+    /**
+     * @notice Begin moving this account to a new wallet. Only the current owner, and nothing changes for
+     * `REBIND_DELAY` — the request is public the whole time, which is the point: a rotation initiated by
+     * a thief with a stolen wallet is visible to the real owner for three days, and cancellable for all
+     * of them. This is rotation, not recovery — a wholly lost wallet is a Phase-4 (enclave binding)
+     * problem, and pretending otherwise here would just build an account-theft mechanism.
+     */
+    function requestRebind(bytes32 accountId, address newOwner) external {
+        address owner = accountOwner[accountId];
+        if (owner != msg.sender) revert NotAccountOwner(owner, msg.sender);
+        if (newOwner == address(0)) revert RebindToZero();
+
+        pendingNewOwner[accountId] = newOwner;
+        uint64 readyAt = uint64(block.timestamp) + REBIND_DELAY;
+        rebindReadyAt[accountId] = readyAt;
+        emit RebindRequested(accountId, newOwner, readyAt);
+    }
+
+    /// @notice Stop a pending rotation. Only the current owner — which is exactly who a thief is not, yet.
+    function cancelRebind(bytes32 accountId) external {
+        address owner = accountOwner[accountId];
+        if (owner != msg.sender) revert NotAccountOwner(owner, msg.sender);
+        if (pendingNewOwner[accountId] == address(0)) revert NoRebindPending(accountId);
+
+        delete pendingNewOwner[accountId];
+        delete rebindReadyAt[accountId];
+        emit RebindCancelled(accountId);
+    }
+
+    /// @notice Complete a rotation once the delay has passed. Callable by anyone; the authorisation
+    /// happened at request time and survived three public days.
+    function finalizeRebind(bytes32 accountId) external {
+        address newOwner = pendingNewOwner[accountId];
+        if (newOwner == address(0)) revert NoRebindPending(accountId);
+        uint64 readyAt = rebindReadyAt[accountId];
+        if (block.timestamp < readyAt) revert RebindNotReady(readyAt, block.timestamp);
+
+        address oldOwner = accountOwner[accountId];
+        accountOwner[accountId] = newOwner;
+        delete pendingNewOwner[accountId];
+        delete rebindReadyAt[accountId];
+        emit RebindFinalized(accountId, oldOwner, newOwner);
+    }
 
     function latestRevenue(bytes32 accountId) external view returns (RevenueRecord memory) {
         RevenueRecord[] storage records = _history[accountId];

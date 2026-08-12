@@ -379,3 +379,110 @@ describe("Attack-resistant underwriting", () => {
         });
     });
 });
+
+describe("Pricing risk and importing history", () => {
+    it("tier-0 borrowers pay the risk premium; the cap pays the base fee", async () => {
+        const { manager, oracle, fxrp, borrower, accountId } = await setup();
+        await manager.setRiskTerms(0, 400); // 4% premium at zero factor, linear to 0 at cap
+        await proveMonths(oracle, borrower, accountId, 400_000, 3);
+
+        // factor 250 -> fee = 500 + 400*(10000-250)/10000 = 890
+        expect(await manager.accountFeeBps(accountId)).to.equal(890);
+        await manager.connect(borrower).requestAdvance(accountId, 10_000);
+        expect((await manager.advanceOf(accountId)).feeCents).to.equal(890n); // $8.90 on $100
+
+        // Repay cleanly five times with an aged account and the premium melts away.
+        await oracle.submitProfileAttestation(accountId, profileProof(JAN));
+        await fxrp.mint(borrower.address, 10_000_000_000n);
+        await fxrp.connect(borrower).approve(await manager.getAddress(), 10_000_000_000n);
+        let a = await manager.advanceOf(accountId);
+        await manager.connect(borrower).repay(accountId, a.outstandingCents);
+        for (let i = 0; i < 4; i++) {
+            await manager.connect(borrower).requestAdvance(accountId, 10_000);
+            a = await manager.advanceOf(accountId);
+            await manager.connect(borrower).repay(accountId, a.outstandingCents);
+        }
+        expect(await manager.accountFactorBps(accountId)).to.equal(10_000);
+        expect(await manager.accountFeeBps(accountId)).to.equal(500);
+    });
+
+    it("imported history lifts an aged account off the cold-start floor", async () => {
+        const { manager, oracle, borrower, accountId } = await setup();
+        await manager.setRiskTerms(800, 0); // +8 points per proven month beyond the first
+        await oracle.submitProfileAttestation(accountId, profileProof(JAN));
+
+        await proveMonths(oracle, borrower, accountId, 400_000, 3);
+        // 250 base + 800 * 2 further months = 1850, with zero repayment cycles.
+        expect(await manager.accountFactorBps(accountId)).to.equal(1_850);
+    });
+
+    it("history means nothing while the account is young", async () => {
+        const { manager, oracle, borrower, accountId } = await setup();
+        await manager.setRiskTerms(800, 0);
+        const now = await time.latest();
+        await oracle.submitProfileAttestation(accountId, profileProof(now - 7 * 24 * 60 * 60));
+
+        await proveMonths(oracle, borrower, accountId, 400_000, 3);
+        expect(await manager.accountFactorBps(accountId)).to.equal(250);
+    });
+});
+
+describe("Wallet rotation", () => {
+    it("moves the account after three public days", async () => {
+        const { oracle, borrower, owner, accountId } = await setup();
+        await proveMonths(oracle, borrower, accountId, 400_000, 1);
+
+        await oracle.connect(borrower).requestRebind(accountId, owner.address);
+        await expect(oracle.finalizeRebind(accountId)).to.be.revertedWithCustomError(
+            oracle,
+            "RebindNotReady"
+        );
+
+        await time.increase(3 * 24 * 60 * 60 + 1);
+        await oracle.finalizeRebind(accountId); // anyone may finalize; the authorisation already happened
+        expect(await oracle.accountOwner(accountId)).to.equal(owner.address);
+    });
+
+    it("only the owner can start or cancel one", async () => {
+        const { oracle, borrower, owner, accountId } = await setup();
+        await proveMonths(oracle, borrower, accountId, 400_000, 1);
+
+        await expect(
+            oracle.connect(owner).requestRebind(accountId, owner.address)
+        ).to.be.revertedWithCustomError(oracle, "NotAccountOwner");
+
+        await oracle.connect(borrower).requestRebind(accountId, owner.address);
+        await expect(oracle.connect(owner).cancelRebind(accountId)).to.be.revertedWithCustomError(
+            oracle,
+            "NotAccountOwner"
+        );
+
+        // The real owner sees the pending transfer and stops it — the thief-visibility property.
+        await oracle.connect(borrower).cancelRebind(accountId);
+        await time.increase(4 * 24 * 60 * 60);
+        await expect(oracle.finalizeRebind(accountId)).to.be.revertedWithCustomError(
+            oracle,
+            "NoRebindPending"
+        );
+    });
+
+    it("the new wallet attests and the old one cannot", async () => {
+        const { oracle, borrower, owner, accountId } = await setup();
+        await proveMonths(oracle, borrower, accountId, 400_000, 1);
+
+        await oracle.connect(borrower).requestRebind(accountId, owner.address);
+        await time.increase(3 * 24 * 60 * 60 + 1);
+        await oracle.finalizeRebind(accountId);
+
+        await expect(
+            oracle
+                .connect(borrower)
+                .submitAttestation(accountId, revenueProof(400_000, JAN + MONTH, JAN + 2 * MONTH))
+        ).to.be.revertedWithCustomError(oracle, "NotAccountOwner");
+        await expect(
+            oracle
+                .connect(owner)
+                .submitAttestation(accountId, revenueProof(400_000, JAN + MONTH, JAN + 2 * MONTH))
+        ).to.not.be.reverted;
+    });
+});

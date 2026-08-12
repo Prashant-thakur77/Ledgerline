@@ -38,6 +38,21 @@ contract LenderPool is ERC4626, Ownable {
     /// @notice FXRP currently out in advances. Part of totalAssets: lent, not gone.
     uint256 public lentFxrp;
 
+    /**
+     * @notice Protocol-owned first-loss capital. It sits in the same FXRP balance but is subtracted from
+     * `totalAssets`, so it backs no shares — write-offs and impairments consume it before they touch the
+     * share price, and its depth is public. This is what makes the LP pitch honest: seniors know exactly
+     * how much loss stands between them and the first cent of damage.
+     */
+    uint256 public juniorAssets;
+
+    /**
+     * @notice XRP received on the XRP Ledger as repayment, awaiting re-mint into FXRP. Counted as an asset
+     * because the claim is real and attested; settled by the re-mint transfer; impairable by governance if
+     * the operator fails to deliver — with the junior tranche absorbing that failure first.
+     */
+    uint256 public xrplReceivableFxrp;
+
     /// @notice Lending stops when lent/total would exceed this, so withdrawals stay possible.
     uint16 public utilisationCapBps = 8_000; // 80%
 
@@ -45,12 +60,19 @@ contract LenderPool is ERC4626, Ownable {
     event UtilisationCapSet(uint16 capBps);
     event Lent(address indexed recipient, uint256 fxrpAmount);
     event RepaymentReceived(uint256 fxrpIn, uint256 fxrpRetired);
-    event WrittenOff(uint256 fxrpRetired);
+    event WrittenOff(uint256 fxrpRetired, uint256 juniorAbsorbed);
+    event JuniorFunded(uint256 amount, uint256 juniorAssets);
+    event JuniorWithdrawn(uint256 amount, uint256 juniorAssets);
+    event XrplRepaymentBooked(uint256 receivableFxrp, uint256 fxrpRetired);
+    event ReceivableSettled(address indexed by, uint256 fxrpIn, uint256 receivableRemaining);
+    event ReceivableImpaired(uint256 amount, uint256 juniorAbsorbed);
 
     error NotManager(address caller);
     error UtilisationCapExceeded(uint256 lentAfter, uint256 totalAfter, uint16 capBps);
     error InvalidCap();
     error ZeroAmount();
+    error ExceedsJunior(uint256 requested, uint256 juniorAssets);
+    error ExceedsReceivable(uint256 requested, uint256 receivable);
 
     modifier onlyManager() {
         if (msg.sender != manager) revert NotManager(msg.sender);
@@ -65,9 +87,10 @@ contract LenderPool is ERC4626, Ownable {
 
     // ---------------------------------------------------------------- accounting
 
-    /// @notice Idle FXRP plus everything currently out in advances.
+    /// @notice What backs the shares: idle FXRP, lent principal, and the attested XRPL receivable — minus
+    /// the junior buffer, which backs losses instead of shares.
     function totalAssets() public view override returns (uint256) {
-        return IERC20(asset()).balanceOf(address(this)) + lentFxrp;
+        return IERC20(asset()).balanceOf(address(this)) + lentFxrp + xrplReceivableFxrp - juniorAssets;
     }
 
     /// @notice What the manager could draw right now: idle liquidity, capped by utilisation.
@@ -81,17 +104,23 @@ contract LenderPool is ERC4626, Ownable {
     }
 
     /*
-     * Withdrawals are honest about illiquidity: only idle FXRP can leave. Advances cannot be recalled, so
-     * a `maxWithdraw` that counted them would promise money the vault cannot produce.
+     * Withdrawals are honest about illiquidity: only idle FXRP can leave, and the junior buffer is not
+     * LPs' to take. Advances cannot be recalled and the receivable has not arrived yet, so a `maxWithdraw`
+     * that counted either would promise money the vault cannot produce.
      */
+    function _idleForLPs() internal view returns (uint256) {
+        uint256 balance = IERC20(asset()).balanceOf(address(this));
+        return balance > juniorAssets ? balance - juniorAssets : 0;
+    }
+
     function maxWithdraw(address owner_) public view override returns (uint256) {
-        uint256 idle = IERC20(asset()).balanceOf(address(this));
+        uint256 idle = _idleForLPs();
         uint256 fromShares = super.maxWithdraw(owner_);
         return fromShares < idle ? fromShares : idle;
     }
 
     function maxRedeem(address owner_) public view override returns (uint256) {
-        uint256 idleAsShares = _convertToShares(IERC20(asset()).balanceOf(address(this)), Math.Rounding.Floor);
+        uint256 idleAsShares = _convertToShares(_idleForLPs(), Math.Rounding.Floor);
         uint256 shares = super.maxRedeem(owner_);
         return shares < idleAsShares ? shares : idleAsShares;
     }
@@ -130,11 +159,72 @@ contract LenderPool is ERC4626, Ownable {
         emit RepaymentReceived(fxrpIn, retired);
     }
 
-    /// @notice Remove written-off principal from the books. The share price takes the loss, visibly.
+    /// @notice Remove written-off principal from the books. The junior buffer absorbs first; only what it
+    /// cannot cover reaches the share price — and both amounts are in the event, so nothing is smoothed.
     function onWriteOff(uint256 fxrpRetired) external onlyManager {
         uint256 retired = fxrpRetired > lentFxrp ? lentFxrp : fxrpRetired;
         lentFxrp -= retired;
-        emit WrittenOff(retired);
+        uint256 absorbed = _absorbIntoJunior(retired);
+        emit WrittenOff(retired, absorbed);
+    }
+
+    /// @dev Consuming junior raises share-backed assets by the same amount the loss removed, so seniors
+    /// are whole up to the buffer's depth. Returns what the buffer absorbed.
+    function _absorbIntoJunior(uint256 loss) internal returns (uint256 absorbed) {
+        absorbed = loss > juniorAssets ? juniorAssets : loss;
+        juniorAssets -= absorbed;
+    }
+
+    /**
+     * @notice Book an XRPL-side repayment: the debt is settled, the XRP is real, and it has not arrived
+     * here yet. The received amount becomes a receivable counted in `totalAssets`, so the share price
+     * states the claim instead of dipping and recovering.
+     */
+    function onXrplRepayment(uint256 receivableFxrp, uint256 fxrpRetired) external onlyManager {
+        uint256 retired = fxrpRetired > lentFxrp ? lentFxrp : fxrpRetired;
+        lentFxrp -= retired;
+        xrplReceivableFxrp += receivableFxrp;
+        emit XrplRepaymentBooked(receivableFxrp, retired);
+    }
+
+    /// @notice Deliver re-minted FXRP against the receivable. Callable by anyone — the ops bot, the owner,
+    /// a well-wisher — because the pool only gets richer.
+    function settleReceivable(uint256 fxrpAmount) external {
+        if (fxrpAmount == 0) revert ZeroAmount();
+        if (fxrpAmount > xrplReceivableFxrp) revert ExceedsReceivable(fxrpAmount, xrplReceivableFxrp);
+        xrplReceivableFxrp -= fxrpAmount;
+        IERC20(asset()).safeTransferFrom(msg.sender, address(this), fxrpAmount);
+        emit ReceivableSettled(msg.sender, fxrpAmount, xrplReceivableFxrp);
+    }
+
+    /// @notice Admit a receivable will not arrive. The junior buffer absorbs first, then the share price.
+    function impairReceivable(uint256 fxrpAmount) external onlyOwner {
+        if (fxrpAmount > xrplReceivableFxrp) revert ExceedsReceivable(fxrpAmount, xrplReceivableFxrp);
+        xrplReceivableFxrp -= fxrpAmount;
+        uint256 absorbed = _absorbIntoJunior(fxrpAmount);
+        emit ReceivableImpaired(fxrpAmount, absorbed);
+    }
+
+    // ---------------------------------------------------------------- the junior tranche
+
+    /// @notice Add first-loss capital. Anyone may deepen the buffer; only the owner may thin it.
+    function fundJunior(uint256 amount) external {
+        if (amount == 0) revert ZeroAmount();
+        juniorAssets += amount;
+        IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
+        emit JuniorFunded(amount, juniorAssets);
+    }
+
+    /// @notice Withdraw junior capital. Thinning the buffer weakens seniors' protection — the event says
+    /// so in numbers, and the withdrawal is bounded by idle balance so it can never touch lent funds.
+    function withdrawJunior(uint256 amount) external onlyOwner {
+        if (amount == 0) revert ZeroAmount();
+        if (amount > juniorAssets) revert ExceedsJunior(amount, juniorAssets);
+        uint256 balance = IERC20(asset()).balanceOf(address(this));
+        if (amount > balance) revert ExceedsJunior(amount, balance);
+        juniorAssets -= amount;
+        IERC20(asset()).safeTransfer(msg.sender, amount);
+        emit JuniorWithdrawn(amount, juniorAssets);
     }
 
     // ---------------------------------------------------------------- governance

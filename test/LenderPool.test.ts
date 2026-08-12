@@ -213,30 +213,130 @@ describe("LenderPool", () => {
             await expect(manager.connect(owner).writeOff(accountId)).to.not.be.reverted;
         });
 
-        it("an XRPL-side repayment dips it until the operator returns the value", async () => {
+        it("an XRPL repayment books a receivable, and settling it delivers the FXRP", async () => {
             const { pool, manager, fxrp, borrower, owner, accountId } = await setup();
             const Am = await ethers.getContractFactory("MockAssetManager");
             const am = await Am.deploy(await fxrp.getAddress(), FXRP(10));
             await manager.setAssetManager(await am.getAddress());
             await manager.setXrplTreasury(XRPL_TREASURY, TEST_XRP);
 
-            // One lot out to the XRP Ledger: $10 debt, 10 FXRP lent.
+            // One lot out to the XRP Ledger: 10 FXRP lent, $10.50 owed at $1/XRP.
             await manager.connect(borrower).requestAdvanceToXrpl(accountId, 1, "rBorrower");
             expect(await pool.lentFxrp()).to.equal(FXRP(10));
 
-            // Repaid in full from the XRP Ledger: debt settles, but the value sits off-pool.
+            // Repaid exactly from the XRP Ledger. The XRP is real and attested; it just is not here yet.
             const a = await manager.advanceOf(accountId);
-            const drops = (a.outstandingCents / 100n) * 1_000_000n + 1_000_000n; // comfortably over
+            const drops = (a.outstandingCents * 1_000_000n) / 100n; // $10.50 -> 10.5 XRP
             await manager.repayFromXrpl(accountId, paymentProof(drops, accountId));
 
             expect((await manager.advanceOf(accountId)).open).to.equal(false);
             expect(await pool.lentFxrp()).to.equal(0n);
-            expect(await pool.totalAssets()).to.equal(FXRP(990)); // the dip, stated
+            expect(await pool.xrplReceivableFxrp()).to.equal(drops);
+            // No dip: the claim is stated as an asset. 990 idle + 10.5 receivable, the 0.5 is fee yield.
+            expect(await pool.totalAssets()).to.equal(FXRP(1_000.5));
 
-            // The operator re-mints the XRP as FXRP and returns it: a plain transfer makes the pool whole.
-            await fxrp.mint(owner.address, FXRP(10));
-            await fxrp.connect(owner).transfer(await pool.getAddress(), FXRP(10));
+            // The operator re-mints and settles: receivable becomes balance, totals unchanged.
+            await fxrp.mint(owner.address, drops);
+            await fxrp.connect(owner).approve(await pool.getAddress(), drops);
+            await pool.connect(owner).settleReceivable(drops);
+            expect(await pool.xrplReceivableFxrp()).to.equal(0n);
+            expect(await pool.totalAssets()).to.equal(FXRP(1_000.5));
+        });
+
+        it("an impaired receivable consumes the junior buffer before the share price", async () => {
+            const { pool, manager, fxrp, borrower, owner, lp, accountId } = await setup();
+            const Am = await ethers.getContractFactory("MockAssetManager");
+            const am = await Am.deploy(await fxrp.getAddress(), FXRP(10));
+            await manager.setAssetManager(await am.getAddress());
+            await manager.setXrplTreasury(XRPL_TREASURY, TEST_XRP);
+
+            // A 5 FXRP junior buffer under the LPs.
+            await fxrp.mint(owner.address, FXRP(5));
+            await fxrp.connect(owner).approve(await pool.getAddress(), FXRP(5));
+            await pool.connect(owner).fundJunior(FXRP(5));
+
+            await manager.connect(borrower).requestAdvanceToXrpl(accountId, 1, "rBorrower");
+            const a = await manager.advanceOf(accountId);
+            const drops = (a.outstandingCents * 1_000_000n) / 100n;
+            await manager.repayFromXrpl(accountId, paymentProof(drops, accountId));
+
+            const before = await pool.totalAssets();
+
+            // The operator never delivers. Governance admits it: junior eats 5, seniors only the rest.
+            await pool.connect(owner).impairReceivable(drops);
+            expect(await pool.xrplReceivableFxrp()).to.equal(0n);
+            expect(await pool.juniorAssets()).to.equal(0n);
+            expect(before - (await pool.totalAssets())).to.equal(drops - FXRP(5));
+            void lp;
+        });
+    });
+
+    describe("the junior tranche", () => {
+        it("a write-off inside the buffer leaves senior LPs whole", async () => {
+            const { pool, manager, fxrp, borrower, owner, lp, accountId } = await setup();
+
+            await fxrp.mint(owner.address, FXRP(200));
+            await fxrp.connect(owner).approve(await pool.getAddress(), FXRP(200));
+            await pool.connect(owner).fundJunior(FXRP(200));
+
+            const seniorBefore = await pool.totalAssets();
+            expect(seniorBefore).to.equal(FXRP(1_000)); // junior backs losses, not shares
+
+            await manager.connect(borrower).requestAdvance(accountId, 10_000); // $100 out
+            await time.increase(46 * 24 * 60 * 60);
+            await manager.markDelinquent(accountId);
+            await time.increase(46 * 24 * 60 * 60);
+            await manager.connect(owner).writeOff(accountId);
+
+            // 100 FXRP lost, all absorbed: seniors see the same total; the buffer shows the wound.
             expect(await pool.totalAssets()).to.equal(FXRP(1_000));
+            expect(await pool.juniorAssets()).to.equal(FXRP(100));
+            expect(await pool.convertToAssets(await pool.balanceOf(lp.address))).to.be.closeTo(FXRP(1_000), 2n);
+        });
+
+        it("a loss beyond the buffer passes the remainder to the share price", async () => {
+            const { pool, manager, fxrp, borrower, owner, accountId } = await setup();
+
+            await fxrp.mint(owner.address, FXRP(30));
+            await fxrp.connect(owner).approve(await pool.getAddress(), FXRP(30));
+            await pool.connect(owner).fundJunior(FXRP(30));
+
+            await manager.connect(borrower).requestAdvance(accountId, 10_000); // 100 FXRP out
+            await time.increase(46 * 24 * 60 * 60);
+            await manager.markDelinquent(accountId);
+            await time.increase(46 * 24 * 60 * 60);
+            await manager.connect(owner).writeOff(accountId);
+
+            // Junior ate 30; seniors ate the remaining 70.
+            expect(await pool.juniorAssets()).to.equal(0n);
+            expect(await pool.totalAssets()).to.equal(FXRP(930));
+        });
+
+        it("LP withdrawals cannot touch the junior buffer", async () => {
+            const { pool, fxrp, owner, lp } = await setup();
+
+            await fxrp.mint(owner.address, FXRP(50));
+            await fxrp.connect(owner).approve(await pool.getAddress(), FXRP(50));
+            await pool.connect(owner).fundJunior(FXRP(50));
+
+            // Idle is 1,050 but 50 of it is the buffer: LPs can take at most their 1,000.
+            expect(await pool.maxWithdraw(lp.address)).to.be.closeTo(FXRP(1_000), 2n);
+        });
+
+        it("only the owner thins the buffer, and never below what is idle", async () => {
+            const { pool, fxrp, owner, lp } = await setup();
+            await fxrp.mint(owner.address, FXRP(10));
+            await fxrp.connect(owner).approve(await pool.getAddress(), FXRP(10));
+            await pool.connect(owner).fundJunior(FXRP(10));
+
+            await expect(pool.connect(lp).withdrawJunior(FXRP(1))).to.be.revertedWithCustomError(
+                pool,
+                "OwnableUnauthorizedAccount"
+            );
+            await expect(pool.connect(owner).withdrawJunior(FXRP(11)))
+                .to.be.revertedWithCustomError(pool, "ExceedsJunior")
+                .withArgs(FXRP(11), FXRP(10));
+            await expect(pool.connect(owner).withdrawJunior(FXRP(10))).to.not.be.reverted;
         });
     });
 

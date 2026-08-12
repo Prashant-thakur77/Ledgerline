@@ -83,6 +83,20 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     uint16 public capFactorBps = 10_000; // 1.0x, after roughly five honest cycles
     uint64 public minAccountAgeSeconds = 30 days;
 
+    /**
+     * @notice History depth as its own tier term: each proven period beyond the first adds this much.
+     * Periods cannot overlap, so importing a year of genuine history is a year of card fees to fake —
+     * which is what lets a real, established business start above the cold-start floor.
+     */
+    uint16 public historyStepBps = 0;
+
+    /**
+     * @notice Expected loss, priced. The origination fee carries a premium proportional to how far the
+     * account sits below the tier cap: tier-0 borrowers pay for the book's risk, proven accounts converge
+     * to the base fee. Zero keeps the deployed flat-fee behaviour.
+     */
+    uint16 public riskPremiumBps = 0;
+
     uint16 public feeBps = 500; // 5% origination fee
     uint16 public repaymentShareBps = 2_000; // 20% of each attested period
     uint256 public maxAdvanceCents = 10_000_000; // $100,000 hard cap
@@ -173,6 +187,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     event AssetManagerSet(address assetManager);
     event MarkedDelinquent(bytes32 indexed accountId, uint256 outstandingCents);
     event FactorScheduleSet(uint16 baseFactorBps, uint16 stepFactorBps, uint16 capFactorBps, uint64 minAccountAgeSeconds);
+    event RiskTermsSet(uint16 historyStepBps, uint16 riskPremiumBps);
     event PoolSet(address pool);
     /// @notice The unrecovered remainder of a delinquent advance, formally taken as the pool's loss.
     event WrittenOff(bytes32 indexed accountId, uint256 outstandingCents, uint256 fxrpWrittenOff);
@@ -235,7 +250,18 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             return baseFactorBps;
         }
         uint256 factor = uint256(baseFactorBps) + uint256(stepFactorBps) * closedCleanCycles[accountId];
+        uint256 periods = oracle.attestationCount(accountId);
+        if (periods > 1) {
+            factor += uint256(historyStepBps) * (periods - 1);
+        }
         return factor >= capFactorBps ? capFactorBps : uint16(factor);
+    }
+
+    /// @notice The fee this account pays: the base plus a premium that shrinks as the earned factor rises.
+    function accountFeeBps(bytes32 accountId) public view returns (uint16) {
+        if (riskPremiumBps == 0) return feeBps;
+        uint256 shortfall = uint256(capFactorBps) - accountFactorBps(accountId);
+        return uint16(uint256(feeBps) + (uint256(riskPremiumBps) * shortfall) / capFactorBps);
     }
 
     /**
@@ -355,7 +381,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         uint256 available = availableFunds();
         if (fxrpAmount > available) revert InsufficientTreasury(available, fxrpAmount);
 
-        uint256 fee = (usdCents * feeBps) / 10_000;
+        uint256 fee = (usdCents * accountFeeBps(accountId)) / 10_000;
 
         advance.principalCents = usdCents;
         advance.feeCents = fee;
@@ -632,13 +658,14 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         }
 
         /*
-         * Deliberately no FXRP inflow recorded: the XRP landed on the XRP Ledger, not here. With a pool
-         * attached, the retired principal books with zero inflow — the share price visibly dips until the
-         * operator re-mints that XRP through FAssets and returns it by plain transfer.
+         * No FXRP arrived here — the XRP landed on the XRP Ledger. With a pool attached, the received
+         * amount books as a receivable (drops and FXRP base units are both millionths, so the mapping is
+         * 1:1), which keeps the share price whole while stating the claim, until the operator re-mints
+         * the XRP through FAssets and settles it.
          */
         if (address(pool) != address(0)) {
             uint256 retired = _retire(accountId, advance, toDebt, closed);
-            pool.onRepayment(0, retired);
+            pool.onXrplRepayment(drops, retired);
         }
 
         emit RepaidFromXrpl(accountId, transactionId, drops, toDebt, price, priceDecimals, advance.outstandingCents);
@@ -754,6 +781,13 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         capFactorBps = newCapFactorBps;
         minAccountAgeSeconds = newMinAccountAgeSeconds;
         emit FactorScheduleSet(newBaseFactorBps, newStepFactorBps, newCapFactorBps, newMinAccountAgeSeconds);
+    }
+
+    /// @notice The two cold-start levers: history-depth tier growth and the risk premium on young accounts.
+    function setRiskTerms(uint16 newHistoryStepBps, uint16 newRiskPremiumBps) external onlyOwner {
+        historyStepBps = newHistoryStepBps;
+        riskPremiumBps = newRiskPremiumBps;
+        emit RiskTermsSet(newHistoryStepBps, newRiskPremiumBps);
     }
 
     function setAssetManager(address newAssetManager) external onlyOwner {

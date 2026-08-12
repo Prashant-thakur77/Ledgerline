@@ -133,10 +133,14 @@ describe("Invariants under a random walk", () => {
             // I4 — debt never exceeds what was owed at origination.
             expect(a.outstandingCents, `I4 @ ${tag}`).to.be.lte(a.principalCents + a.feeCents);
 
-            // I2 — the pool's books balance to its actual holdings.
+            // I2 — the pool's books balance to its actual holdings: idle plus lent plus the attested
+            // XRPL receivable, minus the junior buffer (zero in this walk, asserted so it stays zero).
             const idle = await fxrp.balanceOf(poolAddr);
             const lent = await pool.lentFxrp();
-            expect(await pool.totalAssets(), `I2 @ ${tag}`).to.equal(idle + lent);
+            const receivable = await pool.xrplReceivableFxrp();
+            const junior = await pool.juniorAssets();
+            expect(junior, `junior untouched @ ${tag}`).to.equal(0n);
+            expect(await pool.totalAssets(), `I2 @ ${tag}`).to.equal(idle + lent + receivable - junior);
 
             // I3 — what the pool says is out equals what the one advance has not yet retired.
             const retired = await manager.fxrpRetired(accountId);
@@ -145,7 +149,7 @@ describe("Invariants under a random walk", () => {
 
             // I5 — the share price only falls where the design says it must.
             const supply = await pool.totalSupply();
-            const price = supply === 0n ? 0n : ((idle + lent) * 10n ** 18n) / supply;
+            const price = supply === 0n ? 0n : ((idle + lent + receivable - junior) * 10n ** 18n) / supply;
             if (lastPrice !== 0n && !expectDip) {
                 expect(price, `I5 @ ${tag}`).to.be.gte(lastPrice);
             }
@@ -182,7 +186,7 @@ describe("Invariants under a random walk", () => {
                 const owedXrp = Number(a.outstandingCents / 100n) + 1;
                 const xrp = 1 + Math.floor(rng() * owedXrp * 1.4);
                 await manager.repayFromXrpl(accountId, paymentProof(BigInt(xrp) * DROPS, accountId));
-                expectDip = true;
+                // The receivable keeps the price whole now — the dip moved to credit application.
             } else if (a.open && !a.delinquent && roll < 0.65) {
                 // Let it rot: grace period passes, delinquency lands, sometimes the write-off too.
                 await time.increase(46 * 24 * 60 * 60);
@@ -209,7 +213,9 @@ describe("Invariants under a random walk", () => {
 
         // However the walk ended, the books must balance and the pool must still honour withdrawals.
         const idle = await fxrp.balanceOf(poolAddr);
-        expect(await pool.totalAssets()).to.equal(idle + (await pool.lentFxrp()));
+        expect(await pool.totalAssets()).to.equal(
+            idle + (await pool.lentFxrp()) + (await pool.xrplReceivableFxrp())
+        );
         const out = await pool.maxWithdraw(lp.address);
         if (out > 0n) await pool.connect(lp).withdraw(out, lp.address, lp.address);
     });
