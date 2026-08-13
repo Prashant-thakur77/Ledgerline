@@ -42,7 +42,11 @@ Leave this tab running. Switch to a second tab with the site.
 > account has earned. The base is two and a half percent — deliberately below card
 > processing fees, so faking revenue through your own processor loses money before any
 > other check runs. Risk is priced into the fee, and every input to the decision is on
-> chain."
+> chain. And we underwrite the way acquirers do: revenue inside the 120-day refund window
+> is haircut by age, ten percent of every advance is escrowed as a rolling reserve that
+> returns on a clean close, and merchants can route settlements through an on-chain
+> lockbox that splits repayment out atomically — the mechanics Stripe Capital and
+> Shopify Capital run, on chain, this morning's deployment."
 
 ## 1:50 – 2:30 · The money is real: both legs
 
