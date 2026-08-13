@@ -45,6 +45,7 @@ export default function Landing() {
                     <nav>
                         <Link href="/docs">Docs</Link>
                         <Link href="/security">Security</Link>
+                        <Link href="/roadmap">Roadmap</Link>
                         <a href={REPO} target="_blank" rel="noreferrer">
                             GitHub
                         </a>
@@ -351,6 +352,7 @@ export default function Landing() {
                             <Link href="/docs">Docs</Link>
                             <Link href="/security">Security</Link>
                             <Link href="/confidential">Confidential</Link>
+                            <Link href="/roadmap">Roadmap</Link>
                             <Link href="/app/lend">Lend</Link>
                         </div>
                         <div className="foot-col">

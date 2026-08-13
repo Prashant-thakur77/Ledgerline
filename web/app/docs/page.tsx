@@ -28,6 +28,7 @@ export default function Docs() {
                     <nav>
                         <Link href="/docs" style={{ textDecoration: "none" }}>Docs</Link>
                         <Link href="/security" style={{ textDecoration: "none" }}>Security</Link>
+                        <Link href="/roadmap" style={{ textDecoration: "none" }}>Roadmap</Link>
                         <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
                         <Link href="/app" className="btn">Open the app</Link>
                     </nav>
@@ -141,6 +142,17 @@ export default function Docs() {
                                 refuses to price anything. Advances also carry a 180-day term, so a token
                                 repayment inside each 45-day grace window cannot hold a balance open forever.
                             </p>
+                            <p>
+                                <strong>And it underwrites the way acquirers do.</strong> Revenue inside the
+                                120-day refund window is haircut by age (settled card revenue is not final
+                                money, and no acquirer treats it as such); 10% of each advance is escrowed
+                                as a rolling reserve that releases on a clean close or once the window
+                                passes; a repayment floor curve makes revenue share amortise the way
+                                platform lenders&apos; books do; and merchants can route settlements through
+                                an on-chain lockbox that splits repayment out atomically, springing to full
+                                withholding while an account is behind. The mechanisms and their live
+                                evidence are on <Link href="/roadmap">the roadmap</Link>.
+                            </p>
                         </div>
                     </div>
                 </section>
@@ -245,6 +257,7 @@ export default function Docs() {
                                 ["RevenueOracle", ORACLE_ADDRESS],
                                 ["AdvanceManager", MANAGER_ADDRESS],
                                 ["LenderPool", POOL_ADDRESS],
+                                ["RevenueSplitter", "0xf7982B48D4005F2aa5b2d7AE030996D1d19eD727"],
                                 ["PrivateUnderwriter", "0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a"],
                                 ["GovernanceTimelock", "0x10eBCE7B70f859E3754832862A34B1B0fE45C37A"],
                             ].map(([name, addr]) => (

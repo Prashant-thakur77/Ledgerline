@@ -31,6 +31,7 @@ export default function Confidential() {
                     <nav>
                         <Link href="/docs" style={{ textDecoration: "none" }}>Docs</Link>
                         <Link href="/security" style={{ textDecoration: "none" }}>Security</Link>
+                        <Link href="/roadmap" style={{ textDecoration: "none" }}>Roadmap</Link>
                         <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
                         <Link href="/app" className="btn">Open the app</Link>
                     </nav>
