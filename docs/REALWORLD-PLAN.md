@@ -160,11 +160,15 @@ enterprise-priced and premature before volume.
 
 ## The phased order
 
-**Phase A — protocol code only (no money, no partners):** splitter lockbox + springing
-withholding + floor curve · age-weighted underwriting + rolling reserve · net-revenue schema +
-refund covenants · advance registry · velocity brakes · keeper tip+chip + `delinquencyDue()` ·
-guardian pauser + tiered delays + veto · term→springing (true-sale fix) · reproducible TS build ·
-Stripe read-only App. *Everything here ships as a V5 with tests, exactly the way V4 shipped.*
+**Phase A — protocol code only (no money, no partners): BUILT.** Implemented and tested
+(162 tests) the day the plan was written: the splitter lockbox with springing withholding
+(`RevenueSplitter.sol`), the repayment floor curve with automatic cure, age-weighted
+underwriting, the rolling reserve (escrowed at disbursement, released past the refund window,
+consumed first on write-off), origination velocity brakes, the keeper tip with
+`delinquencyDue()`, and the guardian pause asymmetry. Deploys as V5 after judging; the live V4
+stays frozen so the site's claims keep pointing at the contracts that made them. Still open in
+Phase A: the net-revenue attestation schema (DTO change), reproducible TS build CI, and the
+Stripe read-only App registration.
 
 **Phase B — vendors + ops (~90 days, low 💰):** KYB/UBO credential · Plaid triangle +
 cash-flow adapter · device intelligence · GCP Confidential Space + attestation-gated KMS ·

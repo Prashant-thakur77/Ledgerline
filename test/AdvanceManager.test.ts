@@ -61,6 +61,8 @@ async function setup() {
     const manager = await Manager.deploy(await oracle.getAddress(), await fxrp.getAddress());
     await manager.waitForDeployment();
     await manager.setXrpUsd(XRP_USD, PRICE_DECIMALS);
+        // These suites test the core mechanics; Phase A features have their own suite.
+        await manager.setReserveTerms(0, 1);
     // Legacy tests predate the tier schedule; pin the flat 1.0x factor they assume.
     await manager.setFactorSchedule(10_000, 0, 10_000, 0);
 

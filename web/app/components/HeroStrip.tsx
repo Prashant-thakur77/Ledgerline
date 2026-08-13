@@ -60,7 +60,7 @@ export function HeroStrip() {
             </div>
             <div>
                 <span className="herostrip-label">Test suite</span>
-                <span className="herostrip-value">144 passing</span>
+                <span className="herostrip-value">162 passing</span>
             </div>
         </div>
     );

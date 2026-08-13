@@ -109,6 +109,56 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
      */
     uint64 public maxTermSeconds = 180 days;
 
+    /*
+     * Phase A of the real-world plan (docs/REALWORLD-PLAN.md): the mechanisms the incumbent
+     * industry uses, adapted on-chain. Each is governable and defaults to the researched value.
+     */
+
+    /**
+     * @notice Rolling reserve, the acquiring industry's answer to refund lag: settled card revenue
+     * is not final money for ~120 days, so a slice of each advance is escrowed and released only
+     * once the underwritten revenue has survived the refund window (or the advance closes clean).
+     */
+    uint16 public reserveBps = 1_000; // 10% of each advance
+    uint64 public refundWindowSeconds = 120 days;
+
+    /// @notice Escrowed reserve per advance, in FXRP. Released to the borrower; consumed on write-off.
+    mapping(bytes32 => uint256) public reserveFxrp;
+
+    /**
+     * @notice The repayment floor curve, copied from Stripe Capital's minimum-payment true-up:
+     * revenue share must have returned at least `floorBps` of the obligation by each fraction of
+     * the term, or anyone may declare the account behind schedule — which springs the splitter to
+     * full withholding rather than accelerating a balance (the true-sale-compatible response).
+     */
+    uint16 public floorBpsAtHalfTerm = 3_000; // 30% repaid by half-term
+    mapping(bytes32 => bool) public floorBreached;
+
+    /**
+     * @notice Velocity brakes, the BNPL ladder at protocol level: a cap on originations per epoch,
+     * so a coordinated wave of fresh accounts cannot drain the pool inside one governance delay.
+     */
+    uint32 public maxOriginationsPerEpoch = 50;
+    uint64 public constant ORIGINATION_EPOCH = 1 days;
+    mapping(uint256 => uint32) public originationsInEpoch;
+
+    /**
+     * @notice The keeper's tip for reporting a delinquency, in FXRP, funded by anyone (typically
+     * from protocol fees). Flat rather than proportional: the StableSims result is that keepers'
+     * costs are fixed, so the flat component is what actually moves them. If the reserve is empty
+     * the mark still succeeds; the tip is an incentive, not a precondition.
+     */
+    uint256 public keeperTipFxrp = 5_000_000; // 5 FXRP
+    uint256 public keeperReserveFxrp;
+
+    /**
+     * @notice The guardian: an address that can pause instantly but can never unpause — Compound's
+     * asymmetry. With ownership behind a timelock, an owner-only pause would announce an exploit
+     * response an hour before making it; the guardian closes that window. Repayments stay
+     * unpausable either way.
+     */
+    address public guardian;
+
     /**
      * @notice How stale the XRP/USD feed may be before this contract refuses to price anything.
      * FTSOv2 publishes roughly every 90 seconds, so an hour is ~40 missed updates: comfortably wide enough
@@ -213,6 +263,16 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     event XrplTreasurySet(string xrplAddress, bytes32 xrplAddressHash, bytes32 sourceId);
     event MaxPriceAgeSet(uint64 maxPriceAge);
     event MaxTermSet(uint64 maxTermSeconds);
+    event ReserveEscrowed(bytes32 indexed accountId, uint256 fxrpAmount);
+    event ReserveReleased(bytes32 indexed accountId, address indexed to, uint256 fxrpAmount);
+    event ReserveConsumed(bytes32 indexed accountId, uint256 fxrpAmount);
+    event FloorBreached(bytes32 indexed accountId, uint256 repaidCents, uint256 requiredCents);
+    event KeeperTipped(address indexed keeper, bytes32 indexed accountId, uint256 fxrpAmount);
+    event KeeperReserveFunded(address indexed from, uint256 fxrpAmount);
+    event GuardianSet(address guardian);
+    event ReserveTermsSet(uint16 reserveBps, uint64 refundWindowSeconds);
+    event VelocitySet(uint32 maxOriginationsPerEpoch);
+    event FloorSet(uint16 floorBpsAtHalfTerm);
     /// @notice A repayment that arrived as real XRP on the XRP Ledger and was proven by FDC.
     event RepaidFromXrpl(
         bytes32 indexed accountId,
@@ -250,6 +310,10 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     error XrplPaymentAlreadyUsed(bytes32 transactionId);
     error StalePrice(uint64 feedTimestamp, uint256 blockTimestamp);
     error RedemptionShortfall(uint256 requested, uint256 redeemed);
+    error ReserveNotReleasable();
+    error FloorNotBreached();
+    error OriginationRateExceeded(uint32 inEpoch, uint32 cap);
+    error NotGuardianOrOwner();
 
     constructor(address oracleAddress, address fxrpAddress) Ownable(msg.sender) {
         oracle = RevenueOracle(oracleAddress);
@@ -306,9 +370,24 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         uint256 count = history.length < PERIODS_AVERAGED ? history.length : PERIODS_AVERAGED;
         uint256 total;
         for (uint256 i = history.length - count; i < history.length; i++) {
-            total += history[i].revenueCents;
+            total += _ageWeighted(history[i].revenueCents, history[i].periodEnd);
         }
         return (total / count, uint8(count));
+    }
+
+    /**
+     * @dev The acquiring industry's discount on recent settlement, in underwriting form. Card revenue can
+     * be refunded or disputed for roughly `refundWindowSeconds` after it settles, so a period that ended
+     * yesterday is provisional in a way a five-month-old period is not. Weight runs linearly from 50% for
+     * revenue proven this instant to 100% once the window has fully passed — the same shape as a rolling
+     * reserve, applied to the limit rather than the payout.
+     */
+    function _ageWeighted(uint256 revenueCents, uint64 periodEnd) internal view returns (uint256) {
+        if (block.timestamp <= periodEnd) return revenueCents / 2;
+        uint256 age = block.timestamp - periodEnd;
+        if (age >= refundWindowSeconds) return revenueCents;
+        // 50% at age 0 rising linearly to 100% at the window's edge.
+        return (revenueCents * (5_000 + (5_000 * age) / refundWindowSeconds)) / 10_000;
     }
 
     // ---------------------------------------------------------------- advances
@@ -324,16 +403,49 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
 
         address borrower = _openAdvance(accountId, usdCents, fxrpAmount, price, priceDecimals);
 
+        /*
+         * The rolling reserve: a slice of the advance stays here in escrow instead of reaching the
+         * borrower, released once the underwritten revenue has outlived the refund window (or the
+         * advance closes clean). The debt is still the full amount — the reserve is the borrower's
+         * money held back, exactly as an acquirer holds a merchant's.
+         */
+        uint256 reserved = (fxrpAmount * reserveBps) / 10_000;
         if (address(pool) != address(0)) {
-            pool.lend(borrower, fxrpAmount);
+            if (reserved > 0) pool.lend(address(this), reserved);
+            pool.lend(borrower, fxrpAmount - reserved);
         } else {
             treasuryBalance -= fxrpAmount;
-            fxrp.safeTransfer(borrower, fxrpAmount);
+            fxrp.safeTransfer(borrower, fxrpAmount - reserved);
+        }
+        if (reserved > 0) {
+            reserveFxrp[accountId] = reserved;
+            emit ReserveEscrowed(accountId, reserved);
         }
 
         // Only once the FXRP is actually out can credit retire it: settling the debt before the pool has
         // booked the loan would retire principal that had not been lent yet.
         _applyCredit(accountId, _advances[accountId]);
+    }
+
+    /**
+     * @notice Release an advance's escrowed reserve to the borrower. Permissionless, because the
+     * conditions are on-chain facts: the advance closed without ever going delinquent, or the refund
+     * window has fully passed on an advance that is still current.
+     */
+    function releaseReserve(bytes32 accountId) external nonReentrant {
+        uint256 amount = reserveFxrp[accountId];
+        if (amount == 0) revert InvalidAmount();
+        Advance storage advance = _advances[accountId];
+
+        bool closedClean = !advance.open && !advance.delinquent;
+        bool windowPassed = !advance.delinquent
+            && block.timestamp > uint256(advance.openedAt) + refundWindowSeconds;
+        if (!closedClean && !windowPassed) revert ReserveNotReleasable();
+
+        reserveFxrp[accountId] = 0;
+        address borrower = oracle.accountOwner(accountId);
+        fxrp.safeTransfer(borrower, amount);
+        emit ReserveReleased(accountId, borrower, amount);
     }
 
     /**
@@ -388,6 +500,21 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
+     * @dev The velocity brake. A coordinated wave of fresh accounts should not be able to drain the pool
+     * faster than governance can react; the per-epoch cap bounds the blast radius of any origination
+     * attack to one day's quota regardless of how many identities it wears. Its own function because
+     * `_openAdvance`'s frame is already at the stack limit.
+     */
+    function _takeOriginationSlot() internal {
+        uint256 epoch = block.timestamp / ORIGINATION_EPOCH;
+        uint32 inEpoch = originationsInEpoch[epoch] + 1;
+        if (inEpoch > maxOriginationsPerEpoch) {
+            revert OriginationRateExceeded(inEpoch, maxOriginationsPerEpoch);
+        }
+        originationsInEpoch[epoch] = inEpoch;
+    }
+
+    /**
      * @dev Everything both legs share: underwrite, check, and record. Leaves the caller to move the value,
      * so the effects are all written before anything external is touched.
      */
@@ -407,6 +534,8 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         Advance storage advance = _advances[accountId];
         if (advance.delinquent) revert AccountDelinquent();
         if (advance.open) revert AdvanceAlreadyOpen();
+
+        _takeOriginationSlot();
 
         uint256 limit = advanceLimitCents(accountId);
         if (usdCents > limit) revert ExceedsLimit(limit, usdCents);
@@ -475,6 +604,55 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
+     * @notice Repay with FXRP the caller already holds, on the account's behalf.
+     *
+     * This is the splitter's rail: revenue routed through a lockbox arrives as FXRP in the
+     * splitter's hands, not the borrower's, so the pull-from-borrower path cannot serve it. The
+     * caller pays; the account is credited; anything beyond the outstanding balance banks as
+     * credit, mirroring the XRPL overpayment rule — a lockbox cannot bounce the excess back
+     * mid-split any more than an XRPL payment can be retracted.
+     */
+    function repayFxrpFor(bytes32 accountId, uint256 fxrpAmount) external nonReentrant {
+        if (fxrpAmount == 0) revert InvalidAmount();
+
+        Advance storage advance = _advances[accountId];
+        if (!advance.open) revert NoOpenAdvance();
+
+        (uint256 price, int8 priceDecimals) = _xrpUsdFresh();
+        uint256 usdValue = fxrpToUsdCents(fxrpAmount, price, priceDecimals);
+        if (usdValue == 0) revert InvalidAmount();
+
+        uint256 toDebt = usdValue > advance.outstandingCents ? advance.outstandingCents : usdValue;
+        advance.outstandingCents -= toDebt;
+        advance.lastActivityAt = uint64(block.timestamp);
+
+        bool closed = advance.outstandingCents == 0;
+        if (closed) {
+            advance.open = false;
+            if (!advance.delinquent) closedCleanCycles[accountId] += 1;
+        }
+
+        if (address(pool) != address(0)) {
+            uint256 retired = _retire(accountId, advance, toDebt, closed);
+            fxrp.safeTransferFrom(msg.sender, address(pool), fxrpAmount);
+            pool.onRepayment(fxrpAmount, retired);
+        } else {
+            treasuryBalance += fxrpAmount;
+            fxrp.safeTransferFrom(msg.sender, address(this), fxrpAmount);
+        }
+
+        uint256 toCredit = usdValue - toDebt;
+        if (toCredit > 0) {
+            creditCents[accountId] += toCredit;
+            emit CreditAccrued(accountId, toCredit, creditCents[accountId]);
+        }
+
+        emit Repaid(accountId, msg.sender, toDebt, fxrpAmount, price, priceDecimals, advance.outstandingCents, true);
+        if (closed) emit AdvanceClosed(accountId);
+        _maybeCureFloor(accountId);
+    }
+
+    /**
      * @notice Take the agreed share of a newly attested period as repayment.
      * @dev Pulls FXRP from the borrower, so it needs an allowance. The contract cannot reach into Stripe;
      * what makes this "automatic" is that a proven period triggers it, not that funds move without consent.
@@ -530,6 +708,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             accountId, borrower, usdCents, fxrpAmount, price, priceDecimals, advance.outstandingCents, automatic
         );
         if (closed) emit AdvanceClosed(accountId);
+        _maybeCureFloor(accountId);
     }
 
     /**
@@ -711,6 +890,53 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
+     * @notice How far behind its floor an advance is. The floor is linear-by-parts: `floorBpsAtHalfTerm`
+     * of the obligation by half the term, the whole obligation by the term's end. Returns zero shortfall
+     * while the account is on schedule.
+     */
+    function floorShortfallCents(bytes32 accountId) public view returns (uint256 shortfall, uint256 required) {
+        Advance storage advance = _advances[accountId];
+        if (!advance.open) return (0, 0);
+
+        uint256 elapsed = block.timestamp - advance.openedAt;
+        uint256 owedAtOpen = advance.principalCents + advance.feeCents;
+        if (elapsed <= uint256(maxTermSeconds) / 2) {
+            required = (owedAtOpen * floorBpsAtHalfTerm * elapsed * 2) / (uint256(maxTermSeconds) * 10_000);
+        } else if (elapsed < maxTermSeconds) {
+            uint256 half = (owedAtOpen * floorBpsAtHalfTerm) / 10_000;
+            required = half + ((owedAtOpen - half) * (elapsed - uint256(maxTermSeconds) / 2)) / (uint256(maxTermSeconds) / 2);
+        } else {
+            required = owedAtOpen;
+        }
+        uint256 repaid = owedAtOpen - advance.outstandingCents;
+        shortfall = repaid >= required ? 0 : required - repaid;
+    }
+
+    /**
+     * @notice Declare an account behind its repayment floor. Permissionless; the shortfall is an on-chain
+     * fact. The consequence is springing withholding at the splitter, not acceleration — an advance behind
+     * schedule surrenders its whole revenue stream until it catches up, which is the strongest response a
+     * purchase of receivables can make without becoming a loan.
+     */
+    function declareFloorBreach(bytes32 accountId) external {
+        (uint256 shortfall, uint256 required) = floorShortfallCents(accountId);
+        if (shortfall == 0) revert FloorNotBreached();
+        floorBreached[accountId] = true;
+        Advance storage advance = _advances[accountId];
+        uint256 repaid = advance.principalCents + advance.feeCents - advance.outstandingCents;
+        emit FloorBreached(accountId, repaid, required);
+    }
+
+    /// @dev A repayment that brings the account back over its floor clears the breach automatically.
+    function _maybeCureFloor(bytes32 accountId) internal {
+        if (!floorBreached[accountId]) return;
+        (uint256 shortfall, ) = floorShortfallCents(accountId);
+        if (shortfall == 0) {
+            floorBreached[accountId] = false;
+        }
+    }
+
+    /**
      * @notice Record that an advance has gone unserviced, either way it can.
      *
      * Two independent triggers, because one alone is gameable. Silence past the grace period is the
@@ -729,6 +955,41 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
 
         advance.delinquent = true;
         emit MarkedDelinquent(accountId, advance.outstandingCents);
+
+        /*
+         * The watchman's tip. Flat, because keepers' costs are flat (gas plus monitoring), and paid only
+         * if the reserve can cover it — an empty reserve degrades the incentive, never the function.
+         */
+        uint256 tip = keeperTipFxrp;
+        if (tip > 0 && keeperReserveFxrp >= tip) {
+            keeperReserveFxrp -= tip;
+            fxrp.safeTransfer(msg.sender, tip);
+            emit KeeperTipped(msg.sender, accountId, tip);
+        }
+    }
+
+    /// @notice Fund the keeper tip reserve. Anyone may; protocol fees are the intended source.
+    function fundKeeperReserve(uint256 fxrpAmount) external nonReentrant {
+        if (fxrpAmount == 0) revert InvalidAmount();
+        keeperReserveFxrp += fxrpAmount;
+        fxrp.safeTransferFrom(msg.sender, address(this), fxrpAmount);
+        emit KeeperReserveFunded(msg.sender, fxrpAmount);
+    }
+
+    /**
+     * @notice checkUpkeep-shaped: which of these accounts can be marked delinquent right now. Any bot,
+     * automation network, or curious wallet can consume it; candidates come from event indexing because
+     * the contract deliberately keeps no account enumeration.
+     */
+    function delinquencyDue(bytes32[] calldata accountIds) external view returns (bool[] memory due) {
+        due = new bool[](accountIds.length);
+        for (uint256 i = 0; i < accountIds.length; i++) {
+            Advance storage advance = _advances[accountIds[i]];
+            if (!advance.open || advance.delinquent) continue;
+            due[i] =
+                block.timestamp > advance.lastActivityAt + gracePeriod ||
+                block.timestamp > advance.openedAt + maxTermSeconds;
+        }
     }
 
     /**
@@ -753,8 +1014,25 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         advance.open = false;
         fxrpRetired[accountId] = advance.fxrpDisbursed;
 
-        if (address(pool) != address(0) && lostFxrp > 0) {
-            pool.onWriteOff(lostFxrp);
+        /*
+         * The reserve is consumed before the loss is booked: it is the borrower's held-back money,
+         * and absorbing the write-off is precisely what it was held back for. It returns to the
+         * pool as recovered principal, shrinking what the junior tranche and the share price bear.
+         */
+        uint256 recovered = reserveFxrp[accountId];
+        if (recovered > 0) {
+            reserveFxrp[accountId] = 0;
+            if (recovered > lostFxrp) recovered = lostFxrp;
+            emit ReserveConsumed(accountId, recovered);
+        }
+
+        if (address(pool) != address(0)) {
+            if (recovered > 0) {
+                fxrp.safeTransfer(address(pool), recovered);
+                pool.onRepayment(recovered, recovered);
+            }
+            uint256 netLost = lostFxrp - recovered;
+            if (netLost > 0) pool.onWriteOff(netLost);
         }
 
         emit WrittenOff(accountId, lostCents, lostFxrp);
@@ -839,6 +1117,32 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         emit RiskTermsSet(newHistoryStepBps, newRiskPremiumBps);
     }
 
+    /// @notice Reserve share and the refund window it must outlive.
+    function setReserveTerms(uint16 newReserveBps, uint64 newRefundWindowSeconds) external onlyOwner {
+        if (newReserveBps > 5_000 || newRefundWindowSeconds == 0) revert InvalidAmount();
+        reserveBps = newReserveBps;
+        refundWindowSeconds = newRefundWindowSeconds;
+        emit ReserveTermsSet(newReserveBps, newRefundWindowSeconds);
+    }
+
+    /// @notice The origination velocity cap. Zero would halt the protocol; refuse it.
+    function setVelocity(uint32 newMaxOriginationsPerEpoch) external onlyOwner {
+        if (newMaxOriginationsPerEpoch == 0) revert InvalidAmount();
+        maxOriginationsPerEpoch = newMaxOriginationsPerEpoch;
+        emit VelocitySet(newMaxOriginationsPerEpoch);
+    }
+
+    /// @notice The repayment floor at half-term, and the keeper's flat tip.
+    function setFloor(uint16 newFloorBpsAtHalfTerm) external onlyOwner {
+        if (newFloorBpsAtHalfTerm > 10_000) revert InvalidAmount();
+        floorBpsAtHalfTerm = newFloorBpsAtHalfTerm;
+        emit FloorSet(newFloorBpsAtHalfTerm);
+    }
+
+    function setKeeperTip(uint256 newKeeperTipFxrp) external onlyOwner {
+        keeperTipFxrp = newKeeperTipFxrp;
+    }
+
     /// @notice The outside date on an advance. Zero would mean every advance is delinquent at once.
     function setMaxTerm(uint64 newMaxTermSeconds) external onlyOwner {
         if (newMaxTermSeconds == 0) revert InvalidAmount();
@@ -863,9 +1167,17 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     }
 
     /// @notice Stop originations. Repayments are deliberately unpausable — trapping them would manufacture
-    /// delinquencies out of an operational decision.
-    function pause() external onlyOwner {
+    /// delinquencies out of an operational decision. The guardian may pause instantly; only the owner
+    /// (the timelock) may unpause — Compound's asymmetry, so a compromised guardian can only ever stop
+    /// originations, never steer the protocol, and an exploit response does not wait out its own delay.
+    function pause() external {
+        if (msg.sender != guardian && msg.sender != owner()) revert NotGuardianOrOwner();
         _pause();
+    }
+
+    function setGuardian(address newGuardian) external onlyOwner {
+        guardian = newGuardian;
+        emit GuardianSet(newGuardian);
     }
 
     function unpause() external onlyOwner {

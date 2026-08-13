@@ -79,6 +79,8 @@ async function setup() {
     const Manager = await ethers.getContractFactory("AdvanceManagerHarness");
     const manager = await Manager.deploy(await oracle.getAddress(), await fxrp.getAddress());
     await manager.setXrpUsd(XRP_USD, PRICE_DECIMALS);
+        // These suites test the core mechanics; Phase A features have their own suite.
+        await manager.setReserveTerms(0, 1);
     await manager.setFactorSchedule(10_000, 0, 10_000, 0); // flat 1.0x: these tests are about the pool
 
     const Pool = await ethers.getContractFactory("LenderPool");

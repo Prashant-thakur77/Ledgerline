@@ -92,7 +92,7 @@ export default function Security() {
                         </div>
                         <p className="quiet narrow" style={{ marginTop: 24 }}>
                             The current deployment carries every fix, and the full cycle has been exercised
-                            on it live: attest, borrow from the pool, repay, books closing exactly. 144
+                            on it live: attest, borrow from the pool, repay, books closing exactly. 162
                             automated tests, including a 200-step randomised invariant walk over the pool
                             accounting.
                         </p>
@@ -151,10 +151,13 @@ export default function Security() {
                                 tightly means attesting refund totals as their own field.
                             </p>
                             <p>
-                                <strong>Nobody is paid to report delinquency.</strong>{" "}
-                                <code>markDelinquent</code> is permissionless but unrewarded. The fix is a
-                                small keeper bounty from the pool, and it is deliberately not deployed this
-                                close to a deadline: a money-touching change ships with tests or not at all.
+                                <strong>Nobody is paid to report delinquency: built.</strong> The keeper
+                                tip, the rolling reserve, age-weighted underwriting, the repayment floor,
+                                the origination velocity brake, the deduction-at-source splitter with
+                                springing withholding, and the guardian pause are all implemented and
+                                tested in the repository (162 tests). They deploy as the next generation
+                                after judging; the live deployment stays frozen so every claim on this
+                                site keeps pointing at the contracts that made it.
                             </p>
                             <p>
                                 <strong>The API key in calldata: closed.</strong> FDC requests are public,
