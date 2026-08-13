@@ -594,11 +594,15 @@ button.wide {
 }
 
 /* The clause the product turns on: italic, pink, serif. One gesture instead of a gradient. */
-/* The second line of the headline: same weight, same size, dropped to grey. One gesture, no colour. */
+/*
+ * The second line of the headline: same weight, same size, dropped into a dark crimson — the brand pink
+ * darkened until it reads as embers against the black. Tuned to ~3:1 on pure black, which clears the bar
+ * for display type at this scale while staying unmistakably darker than the white line above it.
+ */
 .grad {
     font-style: normal;
     font-weight: inherit;
-    color: #6b7280;
+    color: #b01e3f;
     background: none;
     -webkit-background-clip: initial;
     background-clip: initial;
