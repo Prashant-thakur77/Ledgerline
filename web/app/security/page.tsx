@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Grain, Mark } from "../components/Chrome";
+import { Grain, SiteHeader } from "../components/Chrome";
 
 export const metadata: Metadata = {
     title: "Security · Proofline",
@@ -44,21 +44,7 @@ export default function Security() {
     return (
         <>
             <Grain />
-            <header className="siteheader">
-                <div className="siteheader-in">
-                    <Link href="/" className="brand">
-                        <Mark />
-                        Proofline
-                    </Link>
-                    <nav>
-                        <Link href="/docs" style={{ textDecoration: "none" }}>Docs</Link>
-                        <Link href="/confidential" style={{ textDecoration: "none" }}>Confidential</Link>
-                        <Link href="/roadmap" style={{ textDecoration: "none" }}>Roadmap</Link>
-                        <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
-                        <Link href="/app" className="btn">Open the app</Link>
-                    </nav>
-                </div>
-            </header>
+            <SiteHeader />
 
             <main className="landing">
                 <section>

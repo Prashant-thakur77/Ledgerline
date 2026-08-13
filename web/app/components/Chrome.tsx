@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 /**
@@ -146,5 +148,58 @@ export function MaskedWords({ text, grad = "" }: { text: string; grad?: string }
                 </span>
             ))}
         </>
+    );
+}
+
+
+/**
+ * The one site header, shared by every marketing page.
+ *
+ * These were hand-rolled per page and drifted: the roadmap page's nav had no Roadmap link, so reaching the
+ * page made its own entry vanish from the bar — navigation that eats itself. One component, one set of
+ * links, and the page you are on stays present and lit.
+ */
+const SITE_LINKS = [
+    { href: "/docs", label: "Docs" },
+    { href: "/security", label: "Security" },
+    { href: "/confidential", label: "Confidential" },
+    { href: "/roadmap", label: "Roadmap" },
+];
+
+export function SiteHeader({ tag }: { tag?: string }) {
+    const pathname = usePathname();
+    return (
+        <header className="siteheader">
+            <div className="siteheader-in">
+                <Link href="/" className="brand">
+                    <Mark />
+                    Proofline
+                    {tag && <span className="brand-tag">{tag}</span>}
+                </Link>
+                <nav>
+                    {SITE_LINKS.map((l) => (
+                        <Link
+                            key={l.href}
+                            href={l.href}
+                            aria-current={pathname === l.href ? "page" : undefined}
+                            className={pathname === l.href ? "sitelink active" : "sitelink"}
+                        >
+                            {l.label}
+                        </Link>
+                    ))}
+                    <a
+                        className="sitelink"
+                        href="https://github.com/Prashant-thakur77/Ledgerline"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        GitHub
+                    </a>
+                    <Link href="/app" className="btn">
+                        Open the app
+                    </Link>
+                </nav>
+            </div>
+        </header>
     );
 }

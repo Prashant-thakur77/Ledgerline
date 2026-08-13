@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Grain, Mark } from "../components/Chrome";
+import { Grain, SiteHeader } from "../components/Chrome";
 
 export const metadata: Metadata = {
     title: "Roadmap · Proofline",
@@ -135,20 +135,7 @@ export default function Roadmap() {
     return (
         <>
             <Grain />
-            <header className="siteheader">
-                <div className="siteheader-in">
-                    <Link href="/" className="brand">
-                        <Mark />
-                        Proofline
-                    </Link>
-                    <nav>
-                        <Link href="/docs" style={{ textDecoration: "none" }}>Docs</Link>
-                        <Link href="/security" style={{ textDecoration: "none" }}>Security</Link>
-                        <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
-                        <Link href="/app" className="btn">Open the app</Link>
-                    </nav>
-                </div>
-            </header>
+            <SiteHeader />
 
             <main className="landing">
                 <section>

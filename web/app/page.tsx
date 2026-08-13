@@ -7,7 +7,7 @@ import { WaveField } from "./components/WaveField";
 import { HeroStrip } from "./components/HeroStrip";
 import { Reveal } from "./components/Reveal";
 import { Stat } from "./components/Stat";
-import { FlareBadge, Mark, Marquee, Grain, ScrollProgress, CardGrid, MaskedWords } from "./components/Chrome";
+import { FlareBadge, Mark, Marquee, Grain, ScrollProgress, CardGrid, MaskedWords, SiteHeader } from "./components/Chrome";
 
 export const metadata: Metadata = {
     title: "Proofline · Prove revenue. Borrow.",
@@ -35,26 +35,7 @@ export default function Landing() {
             <Grain />
             <ScrollProgress />
 
-            <header className="siteheader">
-                <div className="siteheader-in">
-                    <Link href="/" className="brand">
-                        <Mark />
-                        Proofline
-                        <span className="brand-tag">prove revenue · borrow</span>
-                    </Link>
-                    <nav>
-                        <Link href="/docs">Docs</Link>
-                        <Link href="/security">Security</Link>
-                        <Link href="/roadmap">Roadmap</Link>
-                        <a href={REPO} target="_blank" rel="noreferrer">
-                            GitHub
-                        </a>
-                        <Link href="/app" className="btn">
-                            Open the app
-                        </Link>
-                    </nav>
-                </div>
-            </header>
+            <SiteHeader tag="prove revenue · borrow" />
 
             <main className="landing">
                 {/* ---------------------------------------------------------------- hero */}
