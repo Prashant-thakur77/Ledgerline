@@ -100,8 +100,8 @@ export default function Docs() {
                             <p>
                                 <strong>2.5% base.</strong> Deliberately below card-processing fees (~2.9%).
                                 The fundamental attack on revenue-based credit is paying yourself through
-                                your own processor and defaulting; a first advance smaller than what the
-                                fabrication cost makes the attack lose money before any other signal is
+                                your own processor and defaulting; a first advance smaller than the fees paid
+                                to fabricate it makes the attack lose money before any other signal is
                                 consulted.
                             </p>
                             <p>
@@ -113,8 +113,8 @@ export default function Docs() {
                                 <strong>Account age gates everything.</strong> Under 30 attested days (or
                                 with no attested age), the factor stays at base regardless of history. Each
                                 proven month beyond the first adds 8 points, which is how a real business
-                                with a year of history starts above the cold-start floor: importing a year of
-                                genuine history costs a year of card fees to fake.
+                                with a year of history starts above the cold-start floor: faking that year
+                                would cost a year of card fees.
                             </p>
                             <p>
                                 <strong>Risk is priced, not hoped away.</strong> The origination fee is 5%
@@ -131,10 +131,10 @@ export default function Docs() {
                             <p>
                                 <strong>And it underwrites the way acquirers do.</strong> Revenue inside the
                                 120-day refund window is haircut by age (settled card revenue is not final
-                                money, and no acquirer treats it as such); 10% of each advance is escrowed
+                                money, and no acquirer treats it as such). 10% of each advance is escrowed
                                 as a rolling reserve that releases on a clean close or once the window
-                                passes; a repayment floor curve makes revenue share amortise the way
-                                platform lenders&apos; books do; and merchants can route settlements through
+                                passes. A repayment floor curve makes revenue share amortise the way
+                                platform lenders&apos; books do. Merchants can route settlements through
                                 an on-chain lockbox that splits repayment out atomically, springing to full
                                 withholding while an account is behind. The mechanisms and their live
                                 evidence are on <Link href="/roadmap">the roadmap</Link>.

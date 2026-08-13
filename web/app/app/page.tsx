@@ -266,7 +266,7 @@ export default function Page() {
                  */}
                 <h1>Connect a wallet to begin.</h1>
                 <p className="lede">
-                    Everything below is already live on Coston2 and readable without connecting. A wallet is
+                    Everything below is already live on Coston2, Flare&apos;s test network, and readable without connecting. A wallet is
                     needed only to sign. This site never signs for you and never holds a key.
                 </p>
                 <Connect />
@@ -440,7 +440,7 @@ export default function Page() {
                                 <> after {Number(cleanCycles)} cleanly repaid advance{Number(cleanCycles) === 1 ? "" : "s"}</>
                             )}
                             . New accounts start at 2.5%, deliberately below card-processing fees so faking
-                            revenue at yourself costs more than it frees, and every advance repaid in full
+                            revenue at yourself costs more than it frees. Every advance repaid in full
                             without delinquency raises it. Every input is on chain.
                         </>
                     )}
@@ -556,7 +556,7 @@ export default function Page() {
                             <p className="alert" style={{ marginTop: 14, marginBottom: 0 }}>
                                 No lending liquidity is available right now, so an advance cannot be issued.
                                 Everything above is live: the proven revenue, the limit and the price are read
-                                from chain. A deposit in the Lend section below reopens originations.
+                                from chain. A deposit on the Lend page reopens lending.
                             </p>
                         )}
 
@@ -617,7 +617,7 @@ export default function Page() {
                         <span className="figure">{usd(advance!.outstandingCents)}</span>
                         <p className="quiet" style={{ marginTop: 16 }}>
                             in US dollars. This figure does not move when XRP does. The reserve is
-                            held the way an acquirer holds a merchant&apos;s: it returns automatically
+                            held the way a card processor holds a merchant&apos;s reserve: it returns automatically
                             when the advance closes clean, or once the 120-day refund window passes.
                         </p>
                         {advance!.delinquent && (
@@ -661,7 +661,7 @@ export default function Page() {
                     <div className="block">
                         <p style={{ margin: 0 }}>
                             Each newly proven period repays {shareBps ? Number(shareBps) / 100 : 20}% of that
-                            period&apos;s revenue, converted to FXRP at the rate current at that moment. Nobody has to
+                            period&apos;s revenue, converted to FXRP at that moment&apos;s rate. Nobody has to
                             remember to pay; a proven period is the trigger. Prove another period above and watch
                             the figure fall.
                         </p>
@@ -691,7 +691,7 @@ export default function Page() {
                             <p className="quiet" style={{ marginTop: 14, marginBottom: 0 }}>
                                 The reference has to be a single memo of exactly that value. The XRP
                                 Ledger&apos;s <span className="mono">InvoiceID</span> field looks like the right
-                                place and FDC does not read it. Neither leg of this route needs an EVM asset.
+                                place, but FDC does not read it. Neither leg of this route needs an EVM asset.
                             </p>
                         </div>
                     )}

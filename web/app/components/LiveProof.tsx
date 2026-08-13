@@ -72,7 +72,7 @@ export function LiveProof() {
         <div className="proofcard">
             <span className="quiet">
                 Proven on chain for the period ending {day(newest.periodEnd)}. A real Stripe account, read by
-                Flare&apos;s Data Connector
+                Flare&apos;s Data Connector.
             </span>
             <span className="figure amount">{usd(newest.revenueCents)}</span>
             <ProofLine

@@ -101,8 +101,7 @@ export default function Landing() {
                         <Reveal delay={140}>
                             <p className="narrow" style={{ marginTop: 26 }}>
                                 That green line is the whole product. It names which API the figure came from,
-                                which FDC voting round agreed on it, and the Merkle root it resolves to, and
-                                it opens the transaction that verified it.{" "}
+                                which FDC voting round agreed on it, and the Merkle root it resolves to. It opens the transaction that verified it.{" "}
                                 <strong>You can check every part of it without asking us anything.</strong>
                             </p>
                         </Reveal>
@@ -291,7 +290,7 @@ export default function Landing() {
                             <p className="narrow" style={{ marginTop: 20 }}>
                                 Connect any wallet on Coston2 and prove a period against an account bound to
                                 your own address. It takes about two minutes, and the page narrates every step
-                                with links to Flare&apos;s explorers you can open while the voting round is
+                                with links to Flare&apos;s explorers you can follow while the voting round is
                                 still open.
                             </p>
                             <div className="cta">

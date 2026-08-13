@@ -38,7 +38,7 @@ const PHASE_A = [
     },
     {
         h: "The repayment floor",
-        p: "Stripe Capital's minimum-payment true-up as a covenant: 30% of the obligation home by half-term or anyone may declare the account behind, which springs the splitter rather than accelerating a balance. Self-cures the moment repayment catches up.",
+        p: "Stripe Capital's minimum-payment true-up as a covenant: 30% of the obligation repaid by half-term, or anyone may declare the account behind, which springs the splitter rather than accelerating a balance. Self-cures the moment repayment catches up.",
     },
     {
         h: "Velocity brakes and the keeper's tip",
@@ -61,7 +61,7 @@ const PHASE_B = [
     },
     {
         h: "Hardware attestation",
-        p: "The TEE path moves from the simulated platform to confidential VMs (~$150 a month, not a data centre). Prerequisite first: a reproducible TypeScript build, so any auditor can confirm the registered code measurement independently.",
+        p: "The trusted-execution (TEE) path moves from the simulated platform to confidential VMs (~$150 a month, not a data centre). Prerequisite first: a reproducible TypeScript build, so any auditor can confirm the registered code measurement independently.",
     },
     {
         h: "Currency-matched vaults",
@@ -190,10 +190,10 @@ export default function Roadmap() {
                         <h2>Replicable with less trust, or purchasable off the shelf</h2>
                         <p className="narrow">
                             The research kept confirming one thing: every mechanism the incumbents use to
-                            control risk is either replicable on chain with less trust — lockboxes without
-                            the banking-day delay, lien registries without the filing lag, reconciliation
-                            without the lawsuit — or purchasable off the shelf. What remains is sequencing,
-                            and the sequence is above.
+                            control risk is either replicable on chain with less trust or purchasable off
+                            the shelf. Lockboxes without the banking-day delay, lien registries without the
+                            filing lag, reconciliation without the lawsuit. What remains is sequencing, and
+                            the sequence is above.
                         </p>
                     </div>
                 </section>

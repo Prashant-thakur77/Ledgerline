@@ -66,7 +66,7 @@ export function Connect({ compact = false }: { compact?: boolean }) {
                     <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">
                         MetaMask
                     </a>{" "}
-                    (or any injected wallet), reload this page, and add the <strong>Coston2</strong> testnet.
+                    (or any browser wallet), reload this page, and add the <strong>Coston2</strong> testnet.
                     The app will offer to switch you there automatically. Everything on the landing page,
                     including the proven figure and its Merkle root, is readable without a wallet.
                 </p>

@@ -113,8 +113,8 @@ export default function Confidential() {
                             The same account is priced three ways: by the public contract anyone can read, by
                             an enclave-signed decision verified on chain against a registered code
                             measurement, and by the live TEE platform run above. All three say{" "}
-                            <strong>$97.91</strong>. Privacy costs nothing in correctness, and either path
-                            can be checked against the other.
+                            <strong>$97.91</strong>. Privacy costs nothing in correctness, and each path
+                            can be checked against the others.
                         </p>
                         <PrivateDecision />
                         <div className="block" style={{ maxWidth: 760 }}>
@@ -152,7 +152,7 @@ export default function Confidential() {
                         <p className="eyebrow">Still honest</p>
                         <h2>What is not claimed</h2>
                         <p className="narrow">
-                            This runs a simulated TEE, which the Coston2 platform supports through to
+                            This deployment runs a simulated TEE, which the Coston2 platform supports through to
                             PRODUCTION: the code measurement is reported by the proxy rather than attested by
                             confidential hardware. Moving to real hardware changes who vouches for the
                             measurement, not how anything above is verified. The full build, registration

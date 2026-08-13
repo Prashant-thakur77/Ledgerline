@@ -44,7 +44,7 @@ export default function LendPage() {
                 <div className="block">
                     <p>
                         This is unsecured credit against attested revenue. The tier schedule prices a first
-                        advance below the card fees it would cost to fake the revenue behind it, risk is
+                        advance below the card fees it would cost to fake the revenue behind it. Risk is
                         premium-priced into the origination fee, and defaults are written off against the
                         pool with the junior buffer absorbing first. Two exposures are yours by design:
                     </p>

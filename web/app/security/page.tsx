@@ -142,13 +142,13 @@ export default function Security() {
                                 keeper tip, the rolling reserve, age-weighted underwriting, the repayment
                                 floor, the origination velocity brake, the deduction-at-source splitter
                                 with springing withholding, and the guardian pause asymmetry are deployed
-                                and already exercised on the current generation: a live settlement split
+                                and already exercised on the current generation. A live settlement split
                                 itself at the lockbox, and a reserve released on a clean close. 162 tests.
                             </p>
                             <p>
                                 <strong>The API key in calldata: closed.</strong> FDC requests are public,
                                 so on the public path the read-only key travels in the clear. The enclave
-                                path now removes it: a live TEE op reads the processor itself, the
+                                path now removes it: a live TEE run reads the processor itself, the
                                 instruction carries only an account reference and a window, and the on-chain
                                 calldata verifiably contains no credential and no revenue figure. Same
                                 decision as the public path.
@@ -165,7 +165,7 @@ export default function Security() {
                                 </a>
                                 : splitter lockboxes replicate deduction-at-source without the
                                 processor, rolling reserves treat recent revenue as provisional the
-                                way every acquirer does, KYB with beneficial-owner resolution makes
+                                way every acquirer does, business identity checks (KYB) with beneficial-owner resolution make
                                 identity the unit of exposure, and keeper bounties pay the watchman.
                             </p>
                             <p>

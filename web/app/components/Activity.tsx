@@ -137,7 +137,7 @@ function describe(e: Event): { text: string; attested: boolean } {
                 attested: true,
             };
         case "closed":
-            return { text: "Advance closed. Nothing outstanding", attested: false };
+            return { text: "Advance closed · nothing outstanding", attested: false };
         default:
             return { text: e.kind, attested: false };
     }
