@@ -31,6 +31,19 @@ export function WaveField() {
         let running = true;
         let t = 0;
 
+        /*
+         * The cursor as a presence over the landscape. Raw position updates on pointermove; the smoothed
+         * position and the influence strength both glide on springs, so the swell arrives and leaves like
+         * weather rather than snapping. Idle costs nothing: strength decays to zero and the bump is skipped.
+         */
+        const hover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+        let mx = -1e4;
+        let my = -1e4;
+        let smx = -1e4;
+        let smy = -1e4;
+        let strengthTarget = 0;
+        let strength = 0;
+
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
         function resize() {
@@ -55,6 +68,17 @@ export function WaveField() {
         const Z_FAR = 4.6;
         const SWEEP_PERIOD = 7.5; // seconds per proving pass
 
+        const SIGMA = 150; // screen-px radius of the cursor's influence
+        const SIGMA2 = 2 * SIGMA * SIGMA;
+
+        /** How strongly the cursor bears on a screen point: a gaussian of screen distance, times the spring. */
+        function influence(sx: number, sy: number) {
+            if (strength < 0.01) return 0;
+            const dx = sx - smx;
+            const dy = sy - smy;
+            return Math.exp(-(dx * dx + dy * dy) / SIGMA2) * strength;
+        }
+
         /** Surface height for a model-space (x, z) at time t. */
         function surface(x: number, z: number, grain: number) {
             return (
@@ -78,6 +102,18 @@ export function WaveField() {
              * The crimson pass: a band in depth that travels from the horizon to the viewer, rests, and
              * goes again. Ease-in-out so it arrives like a tide rather than a scanline.
              */
+            // The cursor springs: position chases the pointer, strength fades in and out.
+            if (hover) {
+                if (smx < -9e3) {
+                    smx = mx;
+                    smy = my;
+                } else {
+                    smx += (mx - smx) * 0.09;
+                    smy += (my - smy) * 0.09;
+                }
+                strength += (strengthTarget - strength) * 0.06;
+            }
+
             const cycle = (t % SWEEP_PERIOD) / SWEEP_PERIOD;
             const eased = cycle < 0.72 ? (1 - Math.cos((cycle / 0.72) * Math.PI)) / 2 : 1.1;
             const sweepZ = Z_FAR - (Z_FAR - Z_NEAR) * eased;
@@ -103,9 +139,15 @@ export function WaveField() {
                 ctx!.beginPath();
                 for (let col = 0; col < COLS; col++) {
                     const x = ((col / (COLS - 1)) * 2 - 1) * 2.7;
-                    const y = surface(x, z, hash(row * 131 + col) - 0.5);
+                    let y = surface(x, z, hash(row * 131 + col) - 0.5);
                     const sx = cx + (x / z) * focal;
-                    const sy = horizonY + ((y + 1.2) / z) * focal * 0.6;
+                    let sy = horizonY + ((y + 1.2) / z) * focal * 0.6;
+                    // The swell: project first, measure the cursor's bearing, lift, re-project.
+                    const g = influence(sx, sy);
+                    if (g > 0.004) {
+                        y -= g * 0.5;
+                        sy = horizonY + ((y + 1.2) / z) * focal * 0.6;
+                    }
                     if (col === 0) ctx!.moveTo(sx, sy);
                     else ctx!.lineTo(sx, sy);
                 }
@@ -115,12 +157,17 @@ export function WaveField() {
                 for (let col = 0; col < COLS; col += 3) {
                     const x = ((col / (COLS - 1)) * 2 - 1) * 2.7;
                     const grain = hash(row * 131 + col) - 0.5;
-                    const y = surface(x, z, grain);
-                    if (y > -0.25) continue; // only the crests
+                    let y = surface(x, z, grain);
                     const sx = cx + (x / z) * focal;
-                    const sy = horizonY + ((y + 1.2) / z) * focal * 0.6;
-                    const r = Math.min(2.2, Math.max(0.7, depth * 1.9));
-                    const a = Math.min(0.9, Math.max(0.1, depth * 0.75)) + glow * 0.4;
+                    let sy = horizonY + ((y + 1.2) / z) * focal * 0.6;
+                    const g = influence(sx, sy);
+                    if (g > 0.004) {
+                        y -= g * 0.5;
+                        sy = horizonY + ((y + 1.2) / z) * focal * 0.6;
+                    }
+                    if (y > -0.25 && g < 0.2) continue; // crests, or anything the cursor has raised
+                    const r = Math.min(2.2, Math.max(0.7, depth * 1.9)) + g * 0.8;
+                    const a = Math.min(0.9, Math.max(0.1, depth * 0.75)) + glow * 0.4 + g * 0.3;
                     ctx!.fillStyle = inSweep
                         ? `rgba(224, 62, 100, ${Math.min(0.95, a)})`
                         : `rgba(255, 255, 255, ${a})`;
@@ -167,12 +214,28 @@ export function WaveField() {
         };
         document.addEventListener("visibilitychange", onVis);
 
+        const onMove = (e: PointerEvent) => {
+            const rect = canvas.getBoundingClientRect();
+            mx = e.clientX - rect.left;
+            my = e.clientY - rect.top;
+            strengthTarget = 1;
+        };
+        const onLeave = () => {
+            strengthTarget = 0;
+        };
+        if (hover && !reduced) {
+            window.addEventListener("pointermove", onMove, { passive: true });
+            document.documentElement.addEventListener("pointerleave", onLeave);
+        }
+
         return () => {
             running = false;
             cancelAnimationFrame(raf);
             ro.disconnect();
             io.disconnect();
             document.removeEventListener("visibilitychange", onVis);
+            window.removeEventListener("pointermove", onMove);
+            document.documentElement.removeEventListener("pointerleave", onLeave);
         };
     }, []);
 
