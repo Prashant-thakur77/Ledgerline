@@ -24,6 +24,7 @@ with a confidential underwriting path running live on Flare's TEE platform.
 - Docs: https://ledgerline-flare.vercel.app/docs
 - Security / self-audit: https://ledgerline-flare.vercel.app/security
 - Confidential path evidence: https://ledgerline-flare.vercel.app/confidential
+- Roadmap (researched against the incumbent industry): https://ledgerline-flare.vercel.app/roadmap
 
 **Description**
 
