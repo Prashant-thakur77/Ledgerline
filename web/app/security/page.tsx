@@ -164,6 +164,21 @@ export default function Security() {
                                 calldata verifiably contains no credential and no revenue figure. Same
                                 decision as the public path.
                             </p>
+                            <p className="quiet">
+                                Each of these maps to a mechanism the incumbent industry already
+                                uses, researched and sequenced in{" "}
+                                <a
+                                    href="https://github.com/Prashant-thakur77/Ledgerline/blob/main/docs/REALWORLD-PLAN.md"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    the real-world plan
+                                </a>
+                                : splitter lockboxes replicate deduction-at-source without the
+                                processor, rolling reserves treat recent revenue as provisional the
+                                way every acquirer does, KYB with beneficial-owner resolution makes
+                                identity the unit of exposure, and keeper bounties pay the watchman.
+                            </p>
                             <p>
                                 <strong>Jurisdiction.</strong> Revenue-based financing is regulated activity
                                 in most places: loan-versus-sale characterisation, collections, disclosure.

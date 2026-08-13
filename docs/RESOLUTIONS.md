@@ -158,6 +158,9 @@ deliberately scheduled after the judging window rather than during it.
 
 ## 9. The remaining map, priced
 
+> Superseded in detail by [REALWORLD-PLAN.md](REALWORLD-PLAN.md), which maps every item below to
+> the mechanism the incumbent industry actually uses and sequences the adoption. Kept for history.
+
 Kept here so the roadmap is a list of costs rather than wishes.
 
 - **Keeper bounty on `markDelinquent`** — a small reward from the pool for reporting a
