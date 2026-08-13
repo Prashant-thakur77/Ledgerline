@@ -502,13 +502,19 @@ export default function Page() {
                             <span className="mono">
                                 {leg === "fxrp"
                                     ? quoted
-                                        ? `${fxrp(quoted)} FXRP`
+                                        ? `${fxrp((quoted * 9_000n) / 10_000n)} FXRP now`
                                         : "…"
                                     : lot
                                       ? `${fxrp(lot * lotsBn)} XRP less the agent fee`
                                       : "…"}
                             </span>
                         </div>
+                        {leg === "fxrp" && quoted ? (
+                            <div className="row">
+                                <span>Rolling reserve, escrowed</span>
+                                <span className="mono">{fxrp(quoted - (quoted * 9_000n) / 10_000n)} FXRP</span>
+                            </div>
+                        ) : null}
                         <div className="row">
                             <span>XRP/USD used, from FTSOv2</span>
                             <span className="mono">
@@ -610,7 +616,9 @@ export default function Page() {
                     <div className="block">
                         <span className="figure">{usd(advance!.outstandingCents)}</span>
                         <p className="quiet" style={{ marginTop: 16 }}>
-                            in US dollars. This figure does not move when XRP does.
+                            in US dollars. This figure does not move when XRP does. The reserve is
+                            held the way an acquirer holds a merchant&apos;s: it returns automatically
+                            when the advance closes clean, or once the 120-day refund window passes.
                         </p>
                         {advance!.delinquent && (
                             <p className="alert" style={{ marginBottom: 0 }}>

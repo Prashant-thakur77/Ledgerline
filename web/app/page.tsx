@@ -335,9 +335,9 @@ export default function Landing() {
                         </div>
                         <div className="foot-col">
                             <div className="foot-title">Contracts</div>
-                            <a href={`${EXPLORER}/address/0x639ca7C10DC1619d7cAA2B5a286372345194864b#code`} target="_blank" rel="noreferrer">RevenueOracle</a>
-                            <a href={`${EXPLORER}/address/0x24f2c925679e737174103A5F6715b766E3D5D602#code`} target="_blank" rel="noreferrer">AdvanceManager</a>
-                            <a href={`${EXPLORER}/address/0x38560eE630071846158F639a217E6a0fB2d66Fe2#code`} target="_blank" rel="noreferrer">LenderPool</a>
+                            <a href={`${EXPLORER}/address/0x4516155F9069205C6EC982214528a62973477767#code`} target="_blank" rel="noreferrer">RevenueOracle</a>
+                            <a href={`${EXPLORER}/address/0x1187B737EFef8C1D2563C0001553Bf6E7afe25af#code`} target="_blank" rel="noreferrer">AdvanceManager</a>
+                            <a href={`${EXPLORER}/address/0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296#code`} target="_blank" rel="noreferrer">LenderPool</a>
                             <a href={`${EXPLORER}/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code`} target="_blank" rel="noreferrer">PrivateUnderwriter</a>
                         </div>
                         <div className="foot-col">

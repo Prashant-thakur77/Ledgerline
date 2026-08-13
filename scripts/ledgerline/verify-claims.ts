@@ -23,9 +23,13 @@ const FILES = ["README.md", "docs/DEPLOYED.md", "docs/DEMO.md", "docs/PHASE0.md"
  * bare hex string for them — which reads like something is wrong when nothing is.
  */
 const NAMED: Record<string, string> = {
-    "0x639ca7C10DC1619d7cAA2B5a286372345194864b": "RevenueOracle",
-    "0x24f2c925679e737174103A5F6715b766E3D5D602": "AdvanceManager",
-    "0x38560eE630071846158F639a217E6a0fB2d66Fe2": "LenderPool",
+    "0x4516155F9069205C6EC982214528a62973477767": "RevenueOracle",
+    "0x1187B737EFef8C1D2563C0001553Bf6E7afe25af": "AdvanceManager",
+    "0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296": "LenderPool",
+    "0xf7982B48D4005F2aa5b2d7AE030996D1d19eD727": "RevenueSplitter",
+    "0x639ca7C10DC1619d7cAA2B5a286372345194864b": "RevenueOracle (superseded)",
+    "0x24f2c925679e737174103A5F6715b766E3D5D602": "AdvanceManager (superseded)",
+    "0x38560eE630071846158F639a217E6a0fB2d66Fe2": "LenderPool (superseded)",
     "0x151FDDB3d60B1Cc9AD43e0831495D430b0412906": "RevenueOracle (superseded)",
     "0xae027AeB3d1FBa24743D1ADE902521641F32f41c": "AdvanceManager (superseded)",
     "0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7": "LenderPool (superseded)",

@@ -151,13 +151,12 @@ export default function Security() {
                                 tightly means attesting refund totals as their own field.
                             </p>
                             <p>
-                                <strong>Nobody is paid to report delinquency: built.</strong> The keeper
-                                tip, the rolling reserve, age-weighted underwriting, the repayment floor,
-                                the origination velocity brake, the deduction-at-source splitter with
-                                springing withholding, and the guardian pause are all implemented and
-                                tested in the repository (162 tests). They deploy as the next generation
-                                after judging; the live deployment stays frozen so every claim on this
-                                site keeps pointing at the contracts that made it.
+                                <strong>Nobody is paid to report delinquency: closed, live.</strong> The
+                                keeper tip, the rolling reserve, age-weighted underwriting, the repayment
+                                floor, the origination velocity brake, the deduction-at-source splitter
+                                with springing withholding, and the guardian pause asymmetry are deployed
+                                and already exercised on the current generation: a live settlement split
+                                itself at the lockbox, and a reserve released on a clean close. 162 tests.
                             </p>
                             <p>
                                 <strong>The API key in calldata: closed.</strong> FDC requests are public,

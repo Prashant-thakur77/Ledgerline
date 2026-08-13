@@ -1,6 +1,6 @@
-export const ORACLE_ADDRESS = "0x639ca7C10DC1619d7cAA2B5a286372345194864b" as const;
-export const MANAGER_ADDRESS = "0x24f2c925679e737174103A5F6715b766E3D5D602" as const;
-export const POOL_ADDRESS = "0x38560eE630071846158F639a217E6a0fB2d66Fe2" as const;
+export const ORACLE_ADDRESS = "0x4516155F9069205C6EC982214528a62973477767" as const;
+export const MANAGER_ADDRESS = "0x1187B737EFef8C1D2563C0001553Bf6E7afe25af" as const;
+export const POOL_ADDRESS = "0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296" as const;
 export const FXRP_ADDRESS = "0x0b6A3645c240605887a5532109323A3E12273dc7" as const;
 
 export const EXPLORER = "https://coston2-explorer.flare.network";
@@ -10,7 +10,7 @@ export const EXPLORER = "https://coston2-explorer.flare.network";
  * will refuse, or take a very long time over, a range covering the whole chain, and nothing this app cares
  * about happened before its own deployment.
  */
-export const DEPLOY_BLOCK = 33982400n;
+export const DEPLOY_BLOCK = 34012200n;
 
 export const oracleAbi = [
     {

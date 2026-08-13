@@ -52,6 +52,15 @@ What is live on Coston2 today, all verifiable:
   off-pool XRPL settlements) disclosed in the interface where deposits happen.
 - FTSOv2 XRP/USD at every conversion, with feed-decimals treated as data and a staleness
   bound: a feed older than an hour refuses to price.
+- The incumbent industry's risk mechanics, on chain (researched against Stripe/Shopify
+  Capital, the MCA industry, and Maple/Goldfinch/Centrifuge; see docs/REALWORLD-PLAN.md):
+  a RevenueSplitter lockbox splits settlements atomically at arrival and springs to 100%
+  withholding while an account is behind (live: a 2 FXRP settlement auto-serviced the debt,
+  tx 0x3dd05b9d); a 10% rolling reserve escrows at disbursement and released on the clean
+  close (tx 0x076f1d98); underwriting age-weights revenue inside the 120-day refund window
+  (visible in the advance tx: a fresh $3,916.78 period underwritten at $1,958.39);
+  a repayment floor curve, origination velocity caps, a flat keeper tip on markDelinquent,
+  and a guardian that can pause instantly while only the timelock can unpause.
 
 Confidential Compute: the adoption blocker for revenue-based credit is that no business
 publishes its monthly revenue permanently. So the same underwriting runs inside a TEE on
@@ -71,7 +80,7 @@ we ran an adversarial audit of our own deployed contracts and published it. Six 
 defects (credit-ordering share-price inflation, an unbooked XRPL receivable, an
 unchecked price feed age, a one-cent-drip delinquency dodge, silently short FAssets
 fills, and unbounded "period" lengths) — each reproduced as a failing test, fixed,
-redeployed, and exercised live on the current deployment. 144 automated tests including
+redeployed, and exercised live on the current deployment. 162 automated tests including
 a 200-step randomised invariant walk. The repository ships verify-claims.ts, which
 resolves every transaction hash cited in our documentation against Coston2 and fails if
 any claim is not backed.
@@ -84,10 +93,12 @@ Compute (registered extension 66180, live TEE instruction).
 
 **Deployed contracts (Coston2, all source-verified)**
 
-- RevenueOracle 0x639ca7C10DC1619d7cAA2B5a286372345194864b
-- AdvanceManager 0x24f2c925679e737174103A5F6715b766E3D5D602
-- LenderPool 0x38560eE630071846158F639a217E6a0fB2d66Fe2
+- RevenueOracle 0x4516155F9069205C6EC982214528a62973477767
+- AdvanceManager 0x1187B737EFef8C1D2563C0001553Bf6E7afe25af
+- LenderPool 0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296
+- RevenueSplitter 0xf7982B48D4005F2aa5b2d7AE030996D1d19eD727
 - PrivateUnderwriter 0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a
+- GovernanceTimelock 0x10eBCE7B70f859E3754832862A34B1B0fE45C37A
 
 **Team**
 

@@ -27,8 +27,8 @@ these six places:**
 
 | Path | What it is |
 |---|---|
-| [`contracts/ledgerline/`](contracts/ledgerline/) | Four contracts — oracle, manager, lender pool, private underwriter — all source-verified on chain. |
-| [`test/`](test/) | 144 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 200-step invariant walk. |
+| [`contracts/ledgerline/`](contracts/ledgerline/) | Six contracts — oracle, manager, lender pool, revenue splitter, private underwriter, governance timelock — all source-verified on chain. |
+| [`test/`](test/) | 162 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 200-step invariant walk. |
 | [`scripts/ledgerline/`](scripts/ledgerline/) | Deploy, attest, borrow, repay, redeem to XRPL, and a one-screen state dump. |
 | [`web/app/`](web/app/) | The interface, including the live attestation console and its two API routes. |
 | [`web/lib/`](web/lib/) | The Flare protocol layer the browser drives an attestation with. |
@@ -207,7 +207,38 @@ measurement is reported by the proxy rather than attested by confidential hardwa
 
 ## Deployed on Coston2 (chain id 114)
 
-**V4 — current.** The audited generation. An adversarial testing pass over every money path found and fixed
+**V5 — current.** The real-world-plan generation: Phase A of [docs/REALWORLD-PLAN.md](docs/REALWORLD-PLAN.md)
+live on chain. A `RevenueSplitter` lockbox gives deduction-at-source without being the processor — revenue
+splits atomically on arrival, springs to 100% withholding while an account is delinquent or behind its
+repayment floor, and relaxes on cure. Underwriting age-weights attested revenue (a period inside the
+120-day refund window counts 50–100% by age, the acquiring industry's provisional-money rule), a 10%
+rolling reserve escrows at disbursement and releases once the window passes or the advance closes clean,
+a repayment floor curve makes revenue-share amortise the way platform lenders' books do, origination
+velocity is capped per epoch, `markDelinquent` pays a flat keeper tip, and a guardian can pause instantly
+while only the timelock can unpause.
+
+Exercised live within minutes of deployment: revenue proven through a real FDC round
+([`0x4da8d82c…`](https://coston2-explorer.flare.network/tx/0x4da8d82c4bb8ffe1df5ba226e3cafcdbb40ce192cc6b70fad119f849ef9fc7af)),
+a $5 advance disbursing 90% with 10% escrowed — and underwritten from $1,958.39, the age-weighted half of
+the fresh period, both mechanisms visible in one transaction
+([`0x4744fb8c…`](https://coston2-explorer.flare.network/tx/0x4744fb8c05d33e9e844b879276c74a4bc62e72ab184d3c94e31e2d96ab5a4e4e)),
+the splitter enrolled at 20% and a 2 FXRP settlement splitting automatically, $0.40 to the debt
+([`0x3dd05b9d…`](https://coston2-explorer.flare.network/tx/0x3dd05b9d8b1a02bf930cec3a3747f03c1b866e74412df425c23be87f11c0f242)),
+full repayment
+([`0x709665b5…`](https://coston2-explorer.flare.network/tx/0x709665b5ca71a80dd3297c2f13a5033f5a4ca6a8568eea85b6539c1f091f0661))
+and the reserve released back to the borrower on the clean close
+([`0x076f1d98…`](https://coston2-explorer.flare.network/tx/0x076f1d982f6a59fce956926e0ba4a03d7635c0242fc9173e6cc275cf2e727ed2)).
+
+| Contract | Address |
+|---|---|
+| `RevenueOracle` | [`0x4516155F9069205C6EC982214528a62973477767`](https://coston2-explorer.flare.network/address/0x4516155F9069205C6EC982214528a62973477767#code) |
+| `AdvanceManager` | [`0x1187B737EFef8C1D2563C0001553Bf6E7afe25af`](https://coston2-explorer.flare.network/address/0x1187B737EFef8C1D2563C0001553Bf6E7afe25af#code) |
+| `LenderPool` (ERC-4626) | [`0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296`](https://coston2-explorer.flare.network/address/0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296#code) |
+| `RevenueSplitter` (deduction at source) | [`0xf7982B48D4005F2aa5b2d7AE030996D1d19eD727`](https://coston2-explorer.flare.network/address/0xf7982B48D4005F2aa5b2d7AE030996D1d19eD727#code) |
+| `PrivateUnderwriter` (Confidential Compute) | [`0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a`](https://coston2-explorer.flare.network/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code) |
+| `GovernanceTimelock` (owns manager + pool) | [`0x10eBCE7B70f859E3754832862A34B1B0fE45C37A`](https://coston2-explorer.flare.network/address/0x10eBCE7B70f859E3754832862A34B1B0fE45C37A#code) |
+
+**V4 — superseded.** The audited generation. An adversarial testing pass over every money path found and fixed
 five defects the previous deployment carried: credit could retire pool principal before it was lent (a
 share-price inflation), XRP arriving with no open advance was never booked as the pool's claim, the XRP/USD
 feed's age was never checked, a one-cent repayment inside each grace period could hold a balance open
@@ -224,14 +255,6 @@ and its full repayment closing the books exactly
 ([`0x98344c79…`](https://coston2-explorer.flare.network/tx/0x98344c791fd565bedeb707439b75712f5d4aa640acf0cfac66d3dc1c6d9603d0)
 — `lentFxrp` back to zero, one clean cycle earned, the fee in the share price).
 
-| Contract | Address |
-|---|---|
-| `RevenueOracle` | [`0x639ca7C10DC1619d7cAA2B5a286372345194864b`](https://coston2-explorer.flare.network/address/0x639ca7C10DC1619d7cAA2B5a286372345194864b#code) |
-| `AdvanceManager` | [`0x24f2c925679e737174103A5F6715b766E3D5D602`](https://coston2-explorer.flare.network/address/0x24f2c925679e737174103A5F6715b766E3D5D602#code) |
-| `LenderPool` (ERC-4626) | [`0x38560eE630071846158F639a217E6a0fB2d66Fe2`](https://coston2-explorer.flare.network/address/0x38560eE630071846158F639a217E6a0fB2d66Fe2#code) |
-| `PrivateUnderwriter` (Confidential Compute) | [`0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a`](https://coston2-explorer.flare.network/address/0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a#code) |
-| `GovernanceTimelock` (owns manager + pool) | [`0xB0aBFA468a84467a0F9579b6458AFBBfc4f33FE5`](https://coston2-explorer.flare.network/address/0xB0aBFA468a84467a0F9579b6458AFBBfc4f33FE5#code) |
-
 The underwriting policy is behind the timelock: every owner action waits in public (an hour on Coston2,
 demo-scale; days in production) before it executes.
 
@@ -239,6 +262,9 @@ Superseded generations, kept because evidence cited in this document ran on them
 
 | Contract | Address |
 |---|---|
+| `RevenueOracle` (v4) | [`0x639ca7C10DC1619d7cAA2B5a286372345194864b`](https://coston2-explorer.flare.network/address/0x639ca7C10DC1619d7cAA2B5a286372345194864b#code) |
+| `AdvanceManager` (v4) | [`0x24f2c925679e737174103A5F6715b766E3D5D602`](https://coston2-explorer.flare.network/address/0x24f2c925679e737174103A5F6715b766E3D5D602#code) |
+| `LenderPool` (v4) | [`0x38560eE630071846158F639a217E6a0fB2d66Fe2`](https://coston2-explorer.flare.network/address/0x38560eE630071846158F639a217E6a0fB2d66Fe2#code) |
 | `RevenueOracle` (v3) | [`0x151FDDB3d60B1Cc9AD43e0831495D430b0412906`](https://coston2-explorer.flare.network/address/0x151FDDB3d60B1Cc9AD43e0831495D430b0412906#code) |
 | `AdvanceManager` (v3) | [`0xae027AeB3d1FBa24743D1ADE902521641F32f41c`](https://coston2-explorer.flare.network/address/0xae027AeB3d1FBa24743D1ADE902521641F32f41c#code) |
 | `LenderPool` (v3) | [`0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7`](https://coston2-explorer.flare.network/address/0xB6a742c6B2e1Ff4052670a82C97d0558E77235c7#code) |
