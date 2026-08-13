@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Mechanism } from "./components/Mechanism";
 import { LiveProof } from "./components/LiveProof";
 import { Tilt } from "./components/Tilt";
-import { RevenueLine } from "./components/RevenueLine";
+import { WaveField } from "./components/WaveField";
 import { HeroStrip } from "./components/HeroStrip";
 import { Reveal } from "./components/Reveal";
 import { Stat } from "./components/Stat";
@@ -58,7 +58,7 @@ export default function Landing() {
             <main className="landing">
                 {/* ---------------------------------------------------------------- hero */}
                 <section className="hero">
-                    <RevenueLine />
+                    <WaveField />
                     <div className="shell hero-in">
                         <Reveal>
                             <p className="eyebrow">Flare Summer Signal · live on Coston2</p>
