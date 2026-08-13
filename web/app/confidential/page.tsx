@@ -54,12 +54,12 @@ export default function Confidential() {
                         </p>
                         <div className="block" style={{ maxWidth: 760 }}>
                             <div className="row">
-                                <span>Extension</span>
-                                <span className="mono">66180</span>
+                                <span>Extensions</span>
+                                <span className="mono">66180 · 66184 (key-in-enclave)</span>
                             </div>
                             <div className="row">
-                                <span>TEE machine</span>
-                                <span className="mono">0x0f42321d… · status 2, PRODUCTION</span>
+                                <span>TEE machines, both PRODUCTION</span>
+                                <span className="mono">0x0f42321d… · 0x361bB261…</span>
                             </div>
                             <div className="row">
                                 <span>Code measurement</span>
@@ -85,7 +85,7 @@ export default function Confidential() {
                                 <span className="mono">limit $97.91 · factor 2.5% · fee 8.9%</span>
                             </div>
                             <div className="row">
-                                <span>And with the key in the enclave</span>
+                                <span>And with the key in the enclave, on 66184</span>
                                 <a
                                     className="mono"
                                     href={`${EXPLORER}/tx/0x8a9e95937a1843ec76164b5db1fc1633ea274c0bb45137a1635c37d18ed68e88`}

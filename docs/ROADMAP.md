@@ -8,7 +8,7 @@ The dependency spine: **1 → 2 → (3 ∥ 4) → 5 → 6**, with **7 running al
 Phase 1 is first not because it is easiest but because every later phase amplifies its absence — a lender
 pool built over recyclable revenue is a machine for losing other people's money.
 
-Current state assumed throughout: `RevenueOracle` + `AdvanceManager` on Coston2, 144 tests, two FDC
+Current state assumed throughout: `RevenueOracle` + `AdvanceManager` on Coston2, 162 tests, two FDC
 attestation types live (Web2Json in, Payment back), both money legs run on chain, single owner-funded
 treasury, web app at ledgerline-flare.vercel.app.
 
@@ -84,7 +84,7 @@ it can be attested wholesale.
 
 ## Phase 2 — The lender side
 
-**Question it answers: whose money is this?** A single owner-funded treasury caps the product at a demo.
+**Question it answers: whose money is this?** A ERC-4626 lender pool (the owner-funded treasury is V1 history) caps the product at a demo.
 (~5 pw)
 
 ### 2.1 Governance first, pool second

@@ -10,7 +10,7 @@ export const EXPLORER = "https://coston2-explorer.flare.network";
  * will refuse, or take a very long time over, a range covering the whole chain, and nothing this app cares
  * about happened before its own deployment.
  */
-export const DEPLOY_BLOCK = 34012200n;
+export const DEPLOY_BLOCK = 34012225n;
 
 export const oracleAbi = [
     {

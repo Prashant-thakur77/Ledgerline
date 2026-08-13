@@ -1,3 +1,6 @@
+> **HISTORICAL — the V1 deployment record (2026-08-08).** The current generation is V5; its
+> addresses live in [README.md](../README.md) and on the site. Kept because early evidence cites it.
+
 # Deployed — Coston2 (chain id 114)
 
 Deployed 2026-08-08 from `0x5c051991900E6202430d28B26c9D21C7C23ef290`. Both contracts are source-verified on

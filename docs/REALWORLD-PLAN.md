@@ -165,10 +165,11 @@ enterprise-priced and premature before volume.
 (`RevenueSplitter.sol`), the repayment floor curve with automatic cure, age-weighted
 underwriting, the rolling reserve (escrowed at disbursement, released past the refund window,
 consumed first on write-off), origination velocity brakes, the keeper tip with
-`delinquencyDue()`, and the guardian pause asymmetry. Deploys as V5 after judging; the live V4
-stays frozen so the site's claims keep pointing at the contracts that made them. Still open in
-Phase A: the net-revenue attestation schema (DTO change), reproducible TS build CI, and the
-Stripe read-only App registration.
+`delinquencyDue()`, and the guardian pause asymmetry. Deployed as **V5 on 2026-08-13** (addresses
+in the README and on the site) and exercised the same day: the splitter split a live settlement, the
+reserve released on a clean close, and the age haircut is visible in the advance transaction. Still open
+in Phase A: the net-revenue attestation schema (DTO change), reproducible TS build CI, and the Stripe
+read-only App registration.
 
 **Phase B — vendors + ops (~90 days, low 💰):** KYB/UBO credential · Plaid triangle +
 cash-flow adapter · device intelligence · GCP Confidential Space + attestation-gated KMS ·

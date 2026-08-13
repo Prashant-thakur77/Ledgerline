@@ -1,3 +1,6 @@
+> **POINT-IN-TIME (written before V2).** Current truth is [README.md](../README.md); do not act on
+> the addresses, counts, or plans below.
+
 # Ledgerline — handoff brief
 
 Paste this whole file into a fresh Claude Code session. It is self-contained: absolute paths, real addresses,

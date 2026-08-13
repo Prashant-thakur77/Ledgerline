@@ -1,3 +1,8 @@
+> **SUPERSEDED — this run-book was completed on 2026-08-13.** Current submission data lives in
+> [docs/SUBMISSION.md](../docs/SUBMISSION.md); current addresses in [README.md](../README.md). Both
+> bounties are in scope (the FCC extension is registered and has run live). Do not act on the
+> addresses or the bounty guidance below.
+
 # Ledgerline — what is left to do, in order
 
 **Deadline: 14 August 2026, 19:59.** It is 11 August. Everything below is about **3–4 hours of work**, so

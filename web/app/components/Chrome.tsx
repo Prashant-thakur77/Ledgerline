@@ -106,11 +106,6 @@ export function ScrollProgress() {
     return <div className="scrollbar-progress" aria-hidden="true" />;
 }
 
-/** Two slow washes of the brand gradient drifting behind the hero, under the particles. Pure CSS. */
-export function Aurora() {
-    return <div className="aurora" aria-hidden="true" />;
-}
-
 /** A card grid whose hover spotlight follows the cursor. One delegated handler, CSS does the rest. */
 export function CardGrid({ children }: { children: React.ReactNode }) {
     return (

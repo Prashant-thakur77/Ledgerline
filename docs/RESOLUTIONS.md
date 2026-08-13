@@ -151,7 +151,8 @@ RPC failover across the public endpoints. 💰 ~$5–20/mo VPS, or free tiers wh
   (`historyStepBps`), receivable-aware XRPL settlement.
 - `RevenueOracle`: owner-initiated wallet rotation behind a 3-day cancellable timelock.
 
-All parameter defaults preserve the deployed V2 semantics exactly (premiums and history steps default to
+(Historical note — this shipped: V5 deployed 2026-08-13 during the window, with the Phase A mechanisms
+live.) All parameter defaults preserved the then-deployed V2 semantics exactly (premiums and history steps default to
 zero, junior starts empty), so the live demo's behaviour is unchanged until the next deployment — which is
 deliberately scheduled after the judging window rather than during it.
 

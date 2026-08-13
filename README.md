@@ -114,7 +114,7 @@ attestation, not a second month of trading. That run was timed end to end at **1
 
 ### The loop closes: funded in real XRP, repaid in real XRP
 
-Run against the then-current [`AdvanceManager`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code), since superseded by V2 below.
+Run against the then-current [`AdvanceManager`](https://coston2-explorer.flare.network/address/0x63fC5a5c422D40DcC8FA267384BA5351d8698A58#code), since superseded by the current deployment below.
 Money leaves Flare for the XRP Ledger through FAssets, and comes back through a second FDC attestation type.
 **No FXRP, and no EVM asset, is held by the borrower at any point in either direction.**
 
@@ -274,14 +274,14 @@ Superseded generations, kept because evidence cited in this document ran on them
 | FAssets `AssetManager` (FXRP) | [`0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`](https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA) |
 | FXRP (`FTestXRP`) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |
 
-Both contracts are source-verified on the explorer. Full deployment notes in [docs/DEPLOYED.md](docs/DEPLOYED.md).
+All six current contracts are source-verified on the explorer. Full deployment notes in [docs/DEPLOYED.md](docs/DEPLOYED.md).
 
 ## How to run it
 
 ```bash
 cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
 yarn install
-yarn hardhat test             # 144 tests
+yarn hardhat test             # 162 tests
 
 # fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
 yarn hardhat run scripts/ledgerline/deploy.ts --network coston2
@@ -381,7 +381,7 @@ Every file listed in [Where the code is](#where-the-code-is) was written from sc
 - **[`AdvanceManager.sol`](contracts/ledgerline/AdvanceManager.sol)** — underwriting, FTSOv2 conversion, the
   FXRP treasury, `requestAdvance`, `requestAdvanceToXrpl`, manual and revenue-triggered repayment, delinquency.
 
-**Tests** — [`test/`](test/), **65 passing**, `npx hardhat test`
+**Tests** — [`test/`](test/), **162 passing**, `npx hardhat test`
 
 Includes a 3x XRP price move asserting the dollar obligation does not change, and a case running the same
 price at 6 and 8 decimals and demanding the same answer. Four mock contracts stub the FDC and FTSO calls that
@@ -481,30 +481,29 @@ really did process it — borrow $4,000, and default. Every revenue-based lender
 off-chain ones fight it with KYC and bank-account cross-checks. On chain the honest mitigations are
 economic: advance factors for young accounts must sit **below** the card-processing fee so the attack loses
 money, limits must grow only with repayment history, and account age (which Stripe's API reports and FDC
-could attest) must gate the first advance. The current contract has a 1.0x factor from the first period —
-right for a demo, exploitable in production, and the parameters exist to be tightened.
+could attest) must gate the first advance. The current deployment does all three: a 2.5% base factor
+(below card fees), +20 points per cleanly repaid cycle, a 30-day attested-age gate, and — since V5 — an
+age haircut on revenue still inside the 120-day refund window, plus a 10% rolling reserve escrowed at
+disbursement.
 
-**Overlapping periods can fake a history.** The oracle requires each new period to *end* after the previous
-one, but not to *begin* after it — so three windows shifted by a day each count as three periods of history
-while covering essentially the same month of revenue. The averaging means this does not inflate the limit,
-but it defeats any future rule of the form "three months of history before borrowing". The fix is one line
-(`periodStart >= previous periodEnd`) and belongs to the next deployment rather than a rushed one now; our
-own demo data exhibits the pattern, which is how we noticed.
+**Overlapping periods could fake a history** (found in our own demo data, fixed since V2): the oracle now
+requires each period to *begin* at or after the previous one's end, and since V4 a period must also span
+26–32 days, because the underwriting prices it as a month.
 
-**The testnet treasury can be drained by design.** Any visitor who runs the sandbox attestation gets a
-$4,000 limit against a treasury holding a few dollars of testnet FXRP. That asymmetry is deliberate — the
-whole point is that a stranger can complete a real loop — and the exposure is a faucet claim, refilled
-daily. In production this is the same problem as recycling, and has the same mitigations.
+**The testnet pool can be borrowed against by strangers, by design** — the whole point is that a visitor
+can complete a real loop. Under the live tier schedule a fresh sandbox account is limited to 2.5% of one
+age-weighted month (about $50 on the demo figures), against a pool holding a few dollars of testnet FXRP,
+with a 10% reserve held back and originations rate-capped per epoch. The exposure is a faucet claim.
 
 **An XRPL overpayment is kept, not refunded.** `repayFromXrpl` credits a payment only up to the outstanding
 balance; XRP beyond that sits in the treasury's XRPL account with no on-chain path back. Rejecting the
 payment would be worse — XRPL payments are irreversible, so the debt would stand *and* the money would be
 taken. A refund leg needs the same payment machinery in reverse and is not built.
 
-**The owner is trusted.** The owner can withdraw the treasury and set the FAssets and XRPL wiring. That is
-acceptable while the treasury is the owner's own funds, and becomes unacceptable the moment outside lenders
-exist — the lender-side roadmap item carries multisig ownership and timelocks with it, not as an
-afterthought but as a precondition.
+**Governance is a timelock, plus a guardian.** Since V4 the policy levers and the write-off pen sit behind
+an on-chain timelock (an hour on Coston2, demo-scale; days in production), and since V5 a guardian can
+pause originations instantly while only the timelock can unpause — Compound's asymmetry, so an exploit
+response does not wait out its own delay. Production adds a multisig as proposer; that remains open.
 
 ## The flaw in this design, and what fixes it
 
@@ -547,7 +546,7 @@ the measurement, not how any of the above is verified.
 **Network.** Coston2, Flare's EVM testnet, chain id 114. The XRP Ledger leg settles on XRPL testnet. Nothing
 is deployed to mainnet and nothing here involves real money.
 
-**Automated tests.** 46, `npx hardhat test`, covering both contracts. The ones worth naming: a 3x XRP price
+**Automated tests.** 162, `npx hardhat test`, covering all six contracts. The ones worth naming: a 3x XRP price
 move asserting the dollar obligation does not change; the same price supplied at 6 and 8 decimals demanding
 the same answer; replay, account-mismatch, stale-period and wrong-owner guards on the oracle; and the XRPL
 redemption leg against a mock asset manager.
@@ -636,8 +635,9 @@ risks and acceptance criteria — is in [docs/ROADMAP.md](docs/ROADMAP.md).
    would close the gap.
 4. **A second platform.** Shopify or YouTube. The oracle already takes `platform` as a field and `accountRef`
    as opaque, so this is an entry in `revenue-sources.ts` and no contract change.
-5. **A lender side.** The treasury is a single owner-funded pool today. Real capital needs LP shares, a yield
-   split and default accounting.
+5. **The lender side, hardened.** The ERC-4626 pool with a junior first-loss tranche is live; what remains
+   is gated LP access (verified accreditation / geofencing) and the currency-matched dual-vault split from
+   the roadmap's Phase B.
 6. **Underwriting that uses the trend.** The full history is stored and currently only averaged. Growth,
    volatility and seasonality are all visible in it.
 7. **Per-borrower key scoping**, so the published key reads one account's aggregate and nothing else.

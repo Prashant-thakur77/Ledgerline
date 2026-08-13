@@ -519,18 +519,6 @@ button.wide {
     padding: clamp(40px, 6vw, 64px) 0 clamp(28px, 4vw, 44px) !important;
 }
 
-.pulseline {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 100%;
-    height: 46vh;
-    z-index: 0;
-    pointer-events: none;
-}
-
 /* The terrain fills the hero; only the top edge dissolves so the horizon floats free of the header. */
 .wavefield {
     position: absolute;
@@ -1632,52 +1620,6 @@ h3.sub {
  * opacity only, because the demo video needs a steady frame rate. The reduced-motion block above kills
  * all of it.
  */
-
-/* Aurora — two slow washes of the brand gradient drifting behind the hero, under the particles. */
-.aurora {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    z-index: 0;
-}
-
-.aurora::before,
-.aurora::after {
-    content: "";
-    position: absolute;
-    width: 60vmax;
-    height: 60vmax;
-    border-radius: 50%;
-    filter: blur(90px);
-    opacity: 0.16;
-    will-change: transform;
-}
-
-.aurora::before {
-    background: radial-gradient(circle at center, rgba(255,255,255,0.5) 0%, transparent 62%);
-    top: -22vmax;
-    left: -12vmax;
-    animation: auroraA 26s ease-in-out infinite alternate;
-}
-
-.aurora::after {
-    background: radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 62%);
-    bottom: -26vmax;
-    right: -14vmax;
-    opacity: 0.1;
-    animation: auroraB 32s ease-in-out infinite alternate;
-}
-
-@keyframes auroraA {
-    from { transform: translate3d(0, 0, 0) scale(1); }
-    to { transform: translate3d(9vmax, 6vmax, 0) scale(1.15); }
-}
-
-@keyframes auroraB {
-    from { transform: translate3d(0, 0, 0) scale(1.1); }
-    to { transform: translate3d(-8vmax, -5vmax, 0) scale(0.95); }
-}
 
 /* Scroll progress — a hairline of the brand gradient tracking how far through the argument you are. */
 .scrollbar-progress {

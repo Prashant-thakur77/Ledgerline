@@ -1,3 +1,5 @@
+> **SUPERSEDED by [DEMO-SCRIPT.md](DEMO-SCRIPT.md)**, which targets the current deployment and site.
+
 # Demo script — under five minutes
 
 Every number below is real and already on chain. Nothing needs to be staged except the browser tabs.
