@@ -1,0 +1,65 @@
+/**
+ * The keeper: one pass over every account the protocol has ever advanced, doing the two jobs
+ * anyone may do and someone should.
+ *
+ *   npx hardhat run scripts/ledgerline/keeper.ts --network coston2
+ *
+ * 1. Delinquency. `delinquencyDue` is the checkUpkeep-shaped view; a successful mark pays the
+ *    caller the flat tip if the reserve is funded, which makes a cron of this script self-funding.
+ * 2. The repayment floor. An account behind its curve is declared, which springs the splitter to
+ *    full withholding until it cures. Declaring is permissionless because the shortfall is an
+ *    on-chain fact.
+ *
+ * Candidates come from the explorer's log index (AdvanceIssued), because the contracts deliberately
+ * keep no account enumeration and the public RPC caps eth_getLogs at 30 blocks.
+ */
+import { ethers } from "hardhat";
+
+const MANAGER = process.env.MANAGER_ADDRESS ?? "0x1187B737EFef8C1D2563C0001553Bf6E7afe25af";
+const DEPLOY_BLOCK = process.env.DEPLOY_BLOCK ?? "34012225";
+const EXPLORER_API = process.env.COSTON2_EXPLORER_API ?? "https://coston2-explorer.flare.network/api";
+
+// keccak256("AdvanceIssued(bytes32,address,uint256,uint256,uint256,uint256,int8)")
+const ADVANCE_ISSUED_TOPIC = ethers.id("AdvanceIssued(bytes32,address,uint256,uint256,uint256,uint256,int8)");
+
+async function main() {
+    const manager = await ethers.getContractAt("AdvanceManager", MANAGER);
+
+    const url =
+        `${EXPLORER_API}?module=logs&action=getLogs&fromBlock=${DEPLOY_BLOCK}&toBlock=latest` +
+        `&address=${MANAGER}&topic0=${ADVANCE_ISSUED_TOPIC}`;
+    const body = (await (await fetch(url)).json()) as { result?: { topics: string[] }[] };
+    const accounts = [...new Set((body.result ?? []).map((l) => l.topics[1]))] as `0x${string}`[];
+    console.log(`accounts ever advanced: ${accounts.length}`);
+    if (accounts.length === 0) return;
+
+    // Job 1: delinquency.
+    const due = await manager.delinquencyDue(accounts);
+    for (let i = 0; i < accounts.length; i++) {
+        if (!due[i]) continue;
+        console.log(`marking delinquent: ${accounts[i]}`);
+        const tx = await manager.markDelinquent(accounts[i], { gasLimit: 1_000_000 });
+        const receipt = await tx.wait();
+        console.log(`  marked · ${receipt!.hash}`);
+    }
+
+    // Job 2: the floor.
+    for (const id of accounts) {
+        const advance = await manager.advanceOf(id);
+        if (!advance.open || advance.delinquent) continue;
+        if (await manager.floorBreached(id)) continue;
+        const [shortfall, required] = await manager.floorShortfallCents(id);
+        if (shortfall === 0n) continue;
+        console.log(`floor breach: ${id} · $${Number(shortfall) / 100} behind a $${Number(required) / 100} floor`);
+        const tx = await manager.declareFloorBreach(id, { gasLimit: 800_000 });
+        const receipt = await tx.wait();
+        console.log(`  declared · ${receipt!.hash}`);
+    }
+
+    console.log("keeper pass complete: nothing else due");
+}
+
+main().catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+});

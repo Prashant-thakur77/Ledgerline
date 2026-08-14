@@ -1,0 +1,70 @@
+# CI: the contract suite, the extension suite, and the reproducibility check the TEE story rests on.
+#
+# The reproducible-build job exists because of a line in fcc/REPRODUCIBILITY.md: an auditor cannot
+# independently confirm the registered code measurement until the TypeScript build reproduces
+# bit-for-bit from a clean checkout. This job builds the extension twice from scratch and fails if
+# the two dist trees differ - which is the property everything about "attested code" depends on.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contracts:
+    name: hardhat suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: npx hardhat test
+
+  extension:
+    name: fcc extension suite
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fcc/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+      - name: wire conformance
+        working-directory: fcc
+        run: ./scripts/test-conformance.sh typescript
+
+  reproducible-build:
+    name: extension builds reproducibly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: build twice from clean state, compare
+        run: |
+          set -euo pipefail
+          hash_build () {
+            rm -rf "$2"
+            cp -r fcc/typescript "$2"
+            cd "$2"
+            rm -rf node_modules dist
+            npm ci --silent
+            npm run build --silent
+            find dist -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1
+            cd - > /dev/null
+          }
+          A=$(hash_build a /tmp/build-a | tail -1)
+          B=$(hash_build b /tmp/build-b | tail -1)
+          echo "build A: $A"
+          echo "build B: $B"
+          test "$A" = "$B" || { echo "NOT REPRODUCIBLE: dist trees differ"; exit 1; }
+          echo "reproducible: $A"

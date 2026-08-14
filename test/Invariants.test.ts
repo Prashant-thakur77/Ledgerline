@@ -122,6 +122,7 @@ describe("Invariants under a random walk", () => {
 
         const poolAddr = await pool.getAddress();
         let expectDip = false; // set by ops whose value lands off-pool, consumed by the price check
+        let lastJunior = 0n;
         let lastPrice = 0n;
 
         async function assertInvariants(tag: string) {
@@ -139,7 +140,10 @@ describe("Invariants under a random walk", () => {
             const lent = await pool.lentFxrp();
             const receivable = await pool.xrplReceivableFxrp();
             const junior = await pool.juniorAssets();
-            expect(junior, `junior untouched @ ${tag}`).to.equal(0n);
+            // V6: the fee split feeds the junior buffer on every repayment. It may only ever grow here;
+            // nothing in this walk consumes it (no write-offs against it in pool mode with a solvent book).
+            expect(junior, `junior never shrinks @ ${tag}`).to.be.gte(lastJunior);
+            lastJunior = junior;
             expect(await pool.totalAssets(), `I2 @ ${tag}`).to.equal(idle + lent + receivable - junior);
 
             // I3 — what the pool says is out equals what the one advance has not yet retired.

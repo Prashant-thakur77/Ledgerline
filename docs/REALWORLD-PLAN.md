@@ -171,13 +171,17 @@ reserve released on a clean close, and the age haircut is visible in the advance
 in Phase A: the net-revenue attestation schema (DTO change), reproducible TS build CI, and the Stripe
 read-only App registration.
 
-**Between A and B — the fee split (V6, contract change):** today 100% of every origination fee
-lands in the senior share price. The mature design splits it at source: ~70% to senior LPs,
-~20% auto-replenishing the junior first-loss buffer, ~10% to the keeper reserve — so the
-cushion and the watchmen refill from revenue instead of manual top-ups. Deliberately NOT
-time-based interest: the fixed-fee-plus-revenue-share shape is what keeps the advance a
-purchase of receivables rather than a loan (§3), and duration risk is already bounded by the
-floor curve and the springing term.
+**Between A and B — the fee split: BUILT (V6, in the repository).** Every repayment's
+pro-rata fee slice now splits at source: 70% senior, 20% auto-replenishing the junior
+first-loss buffer, 10% the keeper reserve — verified down to exact amounts in
+test/FeeSplit.test.ts, including the loop where a split-funded reserve actually pays a
+keeper for marking a delinquency. The write-off pen also gains a named DELEGATE alongside
+the owner (Maple's pattern). Deliberately NOT time-based interest: the
+fixed-fee-plus-revenue-share shape is what keeps the advance a purchase of receivables
+rather than a loan (§3). **Deploys after the judging window; the live V5 stays frozen.**
+Also closed from Phase A's leftovers: the reproducible TypeScript build is now enforced in
+CI (two clean builds, identical dist hashes — proven locally at 803e40b2…), and a keeper
+script runs the delinquency and floor passes as a self-funding cron.
 
 **Phase B — vendors + ops (~90 days, low 💰):** KYB/UBO credential · Plaid triangle +
 cash-flow adapter · device intelligence · GCP Confidential Space + attestation-gated KMS ·

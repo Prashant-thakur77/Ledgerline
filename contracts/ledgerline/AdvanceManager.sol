@@ -143,6 +143,23 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     mapping(uint256 => uint32) public originationsInEpoch;
 
     /**
+     * @notice The fee split, at source. Every repayment carries a pro-rata slice of the origination
+     * fee; instead of all of it landing in the senior share price, the junior first-loss buffer and
+     * the keeper reserve take their cuts first, so the cushion and the watchmen refill from revenue
+     * rather than manual top-ups. Senior receives the remainder. Zeroing both restores V5 behaviour.
+     */
+    uint16 public juniorFeeBps = 2_000; // 20% of each fee replenishes the junior buffer
+    uint16 public keeperFeeBps = 1_000; // 10% funds the keeper tips
+
+    /**
+     * @notice The write-off pen, held by a named delegate as well as the owner. Maple's lesson:
+     * default is a credit judgment entangled with off-chain recovery, so the industry routes it
+     * through an accountable named party rather than pure governance. The timelock (owner) can
+     * always act; the delegate can act fast.
+     */
+    address public delegate;
+
+    /**
      * @notice The keeper's tip for reporting a delinquency, in FXRP, funded by anyone (typically
      * from protocol fees). Flat rather than proportional: the StableSims result is that keepers'
      * costs are fixed, so the flat component is what actually moves them. If the reserve is empty
@@ -270,6 +287,9 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     event KeeperTipped(address indexed keeper, bytes32 indexed accountId, uint256 fxrpAmount);
     event KeeperReserveFunded(address indexed from, uint256 fxrpAmount);
     event GuardianSet(address guardian);
+    event FeeSplitSet(uint16 juniorFeeBps, uint16 keeperFeeBps);
+    event FeeSplit(bytes32 indexed accountId, uint256 seniorFxrp, uint256 juniorFxrp, uint256 keeperFxrp);
+    event DelegateSet(address delegate);
     event ReserveTermsSet(uint16 reserveBps, uint64 refundWindowSeconds);
     event VelocitySet(uint32 maxOriginationsPerEpoch);
     event FloorSet(uint16 floorBpsAtHalfTerm);
@@ -314,6 +334,8 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     error FloorNotBreached();
     error OriginationRateExceeded(uint32 inEpoch, uint32 cap);
     error NotGuardianOrOwner();
+    error InvalidSplit();
+    error NotDelegateOrOwner();
 
     constructor(address oracleAddress, address fxrpAddress) Ownable(msg.sender) {
         oracle = RevenueOracle(oracleAddress);
@@ -632,14 +654,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             if (!advance.delinquent) closedCleanCycles[accountId] += 1;
         }
 
-        if (address(pool) != address(0)) {
-            uint256 retired = _retire(accountId, advance, toDebt, closed);
-            fxrp.safeTransferFrom(msg.sender, address(pool), fxrpAmount);
-            pool.onRepayment(fxrpAmount, retired);
-        } else {
-            treasuryBalance += fxrpAmount;
-            fxrp.safeTransferFrom(msg.sender, address(this), fxrpAmount);
-        }
+        _collectAndDistribute(accountId, advance, msg.sender, toDebt, fxrpAmount, closed);
 
         uint256 toCredit = usdValue - toDebt;
         if (toCredit > 0) {
@@ -695,20 +710,57 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             if (!advance.delinquent) closedCleanCycles[accountId] += 1;
         }
 
-        if (address(pool) != address(0)) {
-            uint256 retired = _retire(accountId, advance, usdCents, closed);
-            fxrp.safeTransferFrom(borrower, address(pool), fxrpAmount);
-            pool.onRepayment(fxrpAmount, retired);
-        } else {
-            treasuryBalance += fxrpAmount;
-            fxrp.safeTransferFrom(borrower, address(this), fxrpAmount);
-        }
+        _collectAndDistribute(accountId, advance, borrower, usdCents, fxrpAmount, closed);
 
         emit Repaid(
             accountId, borrower, usdCents, fxrpAmount, price, priceDecimals, advance.outstandingCents, automatic
         );
         if (closed) emit AdvanceClosed(accountId);
         _maybeCureFloor(accountId);
+    }
+
+    /**
+     * @dev Collect a repayment's FXRP and distribute it: the fee's slice splits between the junior
+     * buffer and the keeper reserve before the remainder reaches the pool as senior inflow. The
+     * payer's FXRP lands here first, because a splitter cannot split what it never holds.
+     *
+     * In treasury mode only the keeper cut is taken (there is no junior buffer to feed), and the
+     * rest joins the treasury as before.
+     */
+    function _collectAndDistribute(
+        bytes32 accountId,
+        Advance storage advance,
+        address payer,
+        uint256 usdCents,
+        uint256 fxrpAmount,
+        bool closed
+    ) internal {
+        fxrp.safeTransferFrom(payer, address(this), fxrpAmount);
+
+        // The fee's pro-rata slice of this payment, in FXRP.
+        uint256 owedAtOpen = advance.principalCents + advance.feeCents;
+        uint256 fxrpFee = owedAtOpen == 0 ? 0 : (fxrpAmount * advance.feeCents) / owedAtOpen;
+        uint256 juniorCut = (fxrpFee * juniorFeeBps) / 10_000;
+        uint256 keeperCut = (fxrpFee * keeperFeeBps) / 10_000;
+
+        if (keeperCut > 0) {
+            keeperReserveFxrp += keeperCut;
+        }
+
+        if (address(pool) != address(0)) {
+            uint256 retired = _retire(accountId, advance, usdCents, closed);
+            if (juniorCut > 0) {
+                fxrp.forceApprove(address(pool), juniorCut);
+                pool.fundJunior(juniorCut);
+            }
+            uint256 senior = fxrpAmount - juniorCut - keeperCut;
+            fxrp.safeTransfer(address(pool), senior);
+            pool.onRepayment(senior, retired);
+            emit FeeSplit(accountId, senior, juniorCut, keeperCut);
+        } else {
+            treasuryBalance += fxrpAmount - keeperCut;
+            emit FeeSplit(accountId, fxrpAmount - keeperCut, 0, keeperCut);
+        }
     }
 
     /**
@@ -999,7 +1051,8 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
      * leaves its books and every share takes the loss at once, visibly.
      * @dev The account itself stays delinquent, which permanently blocks further advances to it.
      */
-    function writeOff(bytes32 accountId) external onlyOwner nonReentrant {
+    function writeOff(bytes32 accountId) external nonReentrant {
+        if (msg.sender != owner() && msg.sender != delegate) revert NotDelegateOrOwner();
         Advance storage advance = _advances[accountId];
         if (!advance.open) revert NoOpenAdvance();
         if (!advance.delinquent) revert NotDelinquent();
@@ -1141,6 +1194,20 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
 
     function setKeeperTip(uint256 newKeeperTipFxrp) external onlyOwner {
         keeperTipFxrp = newKeeperTipFxrp;
+    }
+
+    /// @notice How each fee splits at source. Senior takes the remainder; zeroing both restores V5.
+    function setFeeSplit(uint16 newJuniorFeeBps, uint16 newKeeperFeeBps) external onlyOwner {
+        if (uint256(newJuniorFeeBps) + newKeeperFeeBps > 10_000) revert InvalidSplit();
+        juniorFeeBps = newJuniorFeeBps;
+        keeperFeeBps = newKeeperFeeBps;
+        emit FeeSplitSet(newJuniorFeeBps, newKeeperFeeBps);
+    }
+
+    /// @notice Name the write-off delegate. Zero address leaves the pen with the owner alone.
+    function setDelegate(address newDelegate) external onlyOwner {
+        delegate = newDelegate;
+        emit DelegateSet(newDelegate);
     }
 
     /// @notice The outside date on an advance. Zero would mean every advance is delinquent at once.

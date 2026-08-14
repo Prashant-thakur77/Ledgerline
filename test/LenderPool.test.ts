@@ -81,6 +81,7 @@ async function setup() {
     await manager.setXrpUsd(XRP_USD, PRICE_DECIMALS);
         // These suites test the core mechanics; Phase A features have their own suite.
         await manager.setReserveTerms(0, 1);
+        await manager.setFeeSplit(0, 0);
     await manager.setFactorSchedule(10_000, 0, 10_000, 0); // flat 1.0x: these tests are about the pool
 
     const Pool = await ethers.getContractFactory("LenderPool");
@@ -210,7 +211,7 @@ describe("LenderPool", () => {
             await time.increase(46 * 24 * 60 * 60);
             await expect(manager.connect(borrower).writeOff(accountId)).to.be.revertedWithCustomError(
                 manager,
-                "OwnableUnauthorizedAccount"
+                "NotDelegateOrOwner"
             );
             await expect(manager.connect(owner).writeOff(accountId)).to.not.be.reverted;
         });

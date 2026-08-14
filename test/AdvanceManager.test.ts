@@ -63,6 +63,7 @@ async function setup() {
     await manager.setXrpUsd(XRP_USD, PRICE_DECIMALS);
         // These suites test the core mechanics; Phase A features have their own suite.
         await manager.setReserveTerms(0, 1);
+        await manager.setFeeSplit(0, 0);
     // Legacy tests predate the tier schedule; pin the flat 1.0x factor they assume.
     await manager.setFactorSchedule(10_000, 0, 10_000, 0);
 
