@@ -10,8 +10,9 @@ import { ethers } from "hardhat";
  *   npx hardhat run scripts/ledgerline/state.ts --network coston2
  */
 
-const ORACLE = "0x151FDDB3d60B1Cc9AD43e0831495D430b0412906";
-const MANAGER = "0xae027AeB3d1FBa24743D1ADE902521641F32f41c";
+const ORACLE = process.env.ORACLE_ADDRESS ?? "0x4516155F9069205C6EC982214528a62973477767";
+const MANAGER = process.env.MANAGER_ADDRESS ?? "0x1187B737EFef8C1D2563C0001553Bf6E7afe25af";
+const POOL = process.env.POOL_ADDRESS ?? "0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296";
 const FXRP = "0x0b6A3645c240605887a5532109323A3E12273dc7";
 const PLATFORM = "stripe";
 const ACCOUNT_REF = process.env.STRIPE_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
@@ -44,6 +45,13 @@ async function main() {
             "function advanceLimitCents(bytes32) view returns (uint256)",
             "function advanceOf(bytes32) view returns (tuple(uint256 principalCents,uint256 feeCents,uint256 outstandingCents,uint256 fxrpDisbursed,uint64 openedAt,uint64 lastActivityAt,uint64 lastAppliedPeriodEnd,bool open,bool delinquent,uint256 avgRevenueCents,uint256 xrpUsdPrice,uint8 periodsUsed,uint16 factorBps,int8 priceDecimals))",
             "function feeBps() view returns (uint16)",
+            "function keeperReserveFxrp() view returns (uint256)",
+            "function reserveFxrp(bytes32) view returns (uint256)",
+            "function creditCents(bytes32) view returns (uint256)",
+            "function juniorFeeBps() view returns (uint16)",
+            "function keeperFeeBps() view returns (uint16)",
+            "function refundWarnBps() view returns (uint16)",
+            "function refundFreezeBps() view returns (uint16)",
             "function repaymentShareBps() view returns (uint16)",
             "function lotSize() view returns (uint256)",
             "function currentXrpUsd() returns (uint256,int8,uint64)",
@@ -60,6 +68,27 @@ async function main() {
     console.log("  AdvanceManager ", MANAGER);
     console.log("  FXRP held      ", ethers.formatUnits(await fxrp.balanceOf(MANAGER), 6));
     console.log("  treasuryBalance", ethers.formatUnits(await manager.treasuryBalance(), 6));
+
+    const pool = new ethers.Contract(
+        POOL,
+        [
+            "function totalAssets() view returns (uint256)",
+            "function lentFxrp() view returns (uint256)",
+            "function xrplReceivableFxrp() view returns (uint256)",
+            "function juniorAssets() view returns (uint256)",
+        ],
+        provider
+    );
+    try {
+        console.log("\npool");
+        console.log("  LenderPool     ", POOL);
+        console.log("  totalAssets    ", ethers.formatUnits(await pool.totalAssets(), 6), "FXRP");
+        console.log("  lent           ", ethers.formatUnits(await pool.lentFxrp(), 6));
+        console.log("  XRPL receivable", ethers.formatUnits(await pool.xrplReceivableFxrp(), 6));
+        console.log("  junior buffer  ", ethers.formatUnits(await pool.juniorAssets(), 6));
+    } catch {
+        console.log("  (no pool at this address)");
+    }
 
     const accountId = await oracle.accountIdFor(PLATFORM, ACCOUNT_REF);
     const history = await oracle.revenueHistory(accountId);
@@ -83,6 +112,17 @@ async function main() {
     console.log("  fee            ", `${Number(await manager.feeBps()) / 100}%`);
     console.log("  repayment share", `${Number(await manager.repaymentShareBps()) / 100}% of each new period`);
     console.log("  FAssets lot    ", `${ethers.formatUnits(await manager.lotSize(), 6)} XRP`);
+
+    // V6 books — absent on a V5 manager, and said so rather than crashing the screen.
+    try {
+        console.log("  fee split      ", `junior ${Number(await manager.juniorFeeBps()) / 100}% / keeper ${Number(await manager.keeperFeeBps()) / 100}% of the fee slice`);
+        console.log("  refund covenant", `warn ${Number(await manager.refundWarnBps()) / 100}%, freeze ${Number(await manager.refundFreezeBps()) / 100}% of gross`);
+        console.log("  keeper reserve ", ethers.formatUnits(await manager.keeperReserveFxrp(), 6), "FXRP");
+        console.log("  rolling reserve", ethers.formatUnits(await manager.reserveFxrp(accountId), 6), "FXRP escrowed");
+        console.log("  banked credit  ", usd(await manager.creditCents(accountId)));
+    } catch {
+        console.log("  (V5 manager — fee split and refund covenants arrive with V6)");
+    }
 
     // Not a view function: a feed read may carry a fee, so it has to be simulated rather than called.
     const [price, decimals] = await manager.currentXrpUsd.staticCall();
