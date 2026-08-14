@@ -154,7 +154,25 @@ const POLICY = {
   riskPremiumBps: 400n,
   maxAdvanceCents: 10_000_000n,
   periodsAveraged: 3,
+  /** The refund window the age haircut runs across — AdvanceManager's `refundWindowSeconds`. */
+  refundWindowSeconds: 120n * 24n * 60n * 60n,
 } as const;
+
+/**
+ * The acquiring industry's discount on recent settlement — AdvanceManager._ageWeighted, verbatim.
+ *
+ * Card revenue can be refunded or disputed for roughly the refund window after it settles, so a
+ * period that ended yesterday is provisional in a way a five-month-old one is not. Weight runs
+ * linearly from 50% for revenue proven this instant to 100% once the window has fully passed.
+ * Omitting it here would make the private path lend nearly twice what the public path allows on
+ * the freshest revenue, which is the least settled money a lender can look at.
+ */
+function ageWeighted(revenueCents: bigint, periodEnd: bigint, nowTs: bigint): bigint {
+  if (nowTs <= periodEnd) return revenueCents / 2n;
+  const age = nowTs - periodEnd;
+  if (age >= POLICY.refundWindowSeconds) return revenueCents;
+  return (revenueCents * (5_000n + (5_000n * age) / POLICY.refundWindowSeconds)) / 10_000n;
+}
 
 let underwriteCount = 0;
 
@@ -249,7 +267,12 @@ export function handleComputeLimit(msg: string): HandlerResult {
   // 3. Execute — AdvanceManager's arithmetic, verbatim in BigInt.
   const periods = req.periods as Period[];
   const lastN = periods.slice(-POLICY.periodsAveraged);
-  const sum = lastN.reduce((s, p) => s + BigInt(p.revenueCents), 0n);
+  // The mean is age-weighted period by period; the latest figure enters raw, exactly as
+  // advanceLimitCents reads it. The smaller of the two binds.
+  const sum = lastN.reduce(
+    (s, p) => s + ageWeighted(BigInt(p.revenueCents), BigInt(p.periodEnd), BigInt(nowTs)),
+    0n
+  );
   const avg = sum / BigInt(lastN.length);
   const latest = BigInt(periods[periods.length - 1].revenueCents);
   const base = latest < avg ? latest : avg;
