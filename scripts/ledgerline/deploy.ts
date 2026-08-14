@@ -66,6 +66,16 @@ async function main() {
     await (await manager.setRiskTerms(800, 400)).wait();
     console.log("Risk terms     : historyStep 800 bps, riskPremium 400 bps");
 
+    // V6 economics ship as contract defaults; read them back so the deploy record names them.
+    console.log(
+        "Fee split      : junior " + (await manager.juniorFeeBps()) + " bps, keeper " +
+        (await manager.keeperFeeBps()) + " bps of each repayment's fee slice, senior the rest"
+    );
+    console.log(
+        "Refund covenant: warn " + (await manager.refundWarnBps()) + " bps (share steps up by half), freeze " +
+        (await manager.refundFreezeBps()) + " bps (no origination until a cleaner month)"
+    );
+
     const xrplTreasury = process.env.XRPL_TREASURY_ADDRESS;
     if (xrplTreasury) {
         await (await manager.setXrplTreasury(xrplTreasury, XRPL_SOURCE_ID)).wait();

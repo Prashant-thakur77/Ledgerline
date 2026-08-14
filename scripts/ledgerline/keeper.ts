@@ -12,6 +12,9 @@
  * 3. Reserve release. A rolling reserve whose advance closed clean, or whose refund window has
  *    passed, belongs to the borrower — releaseReserve is permissionless and pays them directly,
  *    so nobody's money sits escrowed a day longer than the policy requires.
+ * 4. Revenue application. Deduction at source is the product's promise, and applyRevenueRepayment
+ *    is permissionless for exactly this reason: when a fresh attested period sits unapplied against
+ *    an open advance, anyone may make the promise true. The keeper does.
  *
  * Candidates come from the explorer's log index (AdvanceIssued), because the contracts deliberately
  * keep no account enumeration and the public RPC caps eth_getLogs at 30 blocks.
@@ -57,6 +60,25 @@ async function main() {
         const tx = await manager.declareFloorBreach(id, { gasLimit: 800_000 });
         const receipt = await tx.wait();
         console.log(`  declared · ${receipt!.hash}`);
+    }
+
+    // Job 4 (run before release, since applying may close an advance and free its reserve):
+    // fresh attested revenue sitting unapplied against an open advance. The static call IS the
+    // predicate — it reverts for every not-due case (nothing open, period already applied, a
+    // zero-revenue period) and works against V5 and V6 alike, where decoding the oracle's record
+    // client-side would tie the keeper to one ABI generation.
+    for (const id of accounts) {
+        const advance = await manager.advanceOf(id);
+        if (!advance.open || advance.delinquent) continue;
+        try {
+            await manager.applyRevenueRepayment.staticCall(id);
+        } catch {
+            continue;
+        }
+        console.log(`unapplied revenue: ${id}`);
+        const tx = await manager.applyRevenueRepayment(id, { gasLimit: 2_000_000 });
+        const receipt = await tx.wait();
+        console.log(`  applied · ${receipt!.hash}`);
     }
 
     // Job 3: reserves nobody has claimed. Mirror the contract's predicate exactly, then let the
