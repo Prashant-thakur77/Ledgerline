@@ -27,6 +27,12 @@ export function Lend() {
     const { data: lendable } = useReadContract({
         address: POOL_ADDRESS, abi: poolAbi, functionName: "availableToLend", ...every,
     });
+    const { data: junior } = useReadContract({
+        address: POOL_ADDRESS, abi: poolAbi, functionName: "juniorAssets", ...every,
+    });
+    const { data: capBps } = useReadContract({
+        address: POOL_ADDRESS, abi: poolAbi, functionName: "utilisationCapBps",
+    });
     const { data: shares, refetch: refetchShares } = useReadContract({
         address: POOL_ADDRESS, abi: poolAbi, functionName: "balanceOf",
         args: [address!], query: { enabled: Boolean(address), refetchInterval: 15_000 },
@@ -64,6 +70,14 @@ export function Lend() {
             <div className="row">
                 <span>Available to lend</span>
                 <span className="mono">{lendable !== undefined ? `${fxrp(lendable)} FXRP` : "…"}</span>
+            </div>
+            <div className="row">
+                <span>First-loss junior buffer</span>
+                <span className="mono">{junior !== undefined ? `${fxrp(junior)} FXRP` : "…"}</span>
+            </div>
+            <div className="row">
+                <span>Utilisation cap</span>
+                <span className="mono">{capBps !== undefined ? `${Number(capBps) / 100}%` : "…"}</span>
             </div>
 
             {isConnected && (shares ?? 0n) > 0n && (

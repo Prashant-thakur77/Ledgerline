@@ -2,6 +2,7 @@ export const ORACLE_ADDRESS = "0x4516155F9069205C6EC982214528a62973477767" as co
 export const MANAGER_ADDRESS = "0x1187B737EFef8C1D2563C0001553Bf6E7afe25af" as const;
 export const POOL_ADDRESS = "0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296" as const;
 export const FXRP_ADDRESS = "0x0b6A3645c240605887a5532109323A3E12273dc7" as const;
+export const SPLITTER_ADDRESS = "0xf7982B48D4005F2aa5b2d7AE030996D1d19eD727" as const;
 
 export const EXPLORER = "https://coston2-explorer.flare.network";
 
@@ -199,6 +200,13 @@ export const managerAbi = [
         inputs: [{ name: "accountId", type: "bytes32" }],
         outputs: [],
     },
+    {
+        type: "function",
+        name: "applyRevenueRepayment",
+        stateMutability: "nonpayable",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [],
+    },
     { type: "function", name: "reserveFxrp", stateMutability: "view", inputs: [{ name: "accountId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
     {
         type: "function",
@@ -337,9 +345,43 @@ export const poolAbi = [
         ],
         outputs: [{ type: "uint256" }],
     },
+    { type: "function", name: "juniorAssets", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+    { type: "function", name: "utilisationCapBps", stateMutability: "view", inputs: [], outputs: [{ type: "uint16" }] },
 ] as const;
 
 /** ERC-20 surface the lend flow needs: approve the pool, read the wallet's FXRP. */
+export const splitterAbi = [
+    {
+        type: "function",
+        name: "routes",
+        stateMutability: "view",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [
+            { name: "payout", type: "address" },
+            { name: "shareBps", type: "uint16" },
+            { name: "enrolled", type: "bool" },
+        ],
+    },
+    {
+        type: "function",
+        name: "enroll",
+        stateMutability: "nonpayable",
+        inputs: [
+            { name: "accountId", type: "bytes32" },
+            { name: "payout", type: "address" },
+            { name: "shareBps", type: "uint16" },
+        ],
+        outputs: [],
+    },
+    {
+        type: "function",
+        name: "unenroll",
+        stateMutability: "nonpayable",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [],
+    },
+] as const;
+
 export const erc20Abi = [
     {
         type: "function",

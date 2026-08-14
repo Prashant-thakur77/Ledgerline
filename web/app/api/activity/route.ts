@@ -27,7 +27,7 @@ type Kind =
     | "advance-xrpl"
     | "repaid"
     | "repaid-xrpl"
-    | "closed";
+    | "closed" | "reserve-escrowed" | "reserve-released" | "credit-applied";
 
 const TOPICS: Record<string, { kind: Kind; address: string; fields: readonly { name: string; type: string }[] }> = {
     "0x578ed25fda9adc5cab8eb8bdfacf85bb29debf54c934f7487ef4d28124a6564e": {
@@ -86,6 +86,24 @@ const TOPICS: Record<string, { kind: Kind; address: string; fields: readonly { n
             { name: "usdCents", type: "uint256" },
             { name: "xrpUsdPrice", type: "uint256" },
             { name: "priceDecimals", type: "int8" },
+            { name: "outstandingCents", type: "uint256" },
+        ],
+    },
+    "0x106a8c64c5e9c8ad83fdf9fd3e4e05d8f599cca84ef0f0381b5f0208cf88af62": {
+        kind: "reserve-escrowed",
+        address: MANAGER_ADDRESS,
+        fields: [{ name: "fxrpAmount", type: "uint256" }],
+    },
+    "0x1251bfcedc86b78e263701937474451126677537bc7bdc879eca9548d36a158d": {
+        kind: "reserve-released",
+        address: MANAGER_ADDRESS,
+        fields: [{ name: "fxrpAmount", type: "uint256" }],
+    },
+    "0xdcf34ec96c28f54662eff7d6dc892f4f4400c63ea6db837aedd792a0f5daf4ed": {
+        kind: "credit-applied",
+        address: MANAGER_ADDRESS,
+        fields: [
+            { name: "usdCents", type: "uint256" },
             { name: "outstandingCents", type: "uint256" },
         ],
     },

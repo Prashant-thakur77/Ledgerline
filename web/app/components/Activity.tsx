@@ -138,6 +138,23 @@ function describe(e: Event): { text: string; attested: boolean } {
             };
         case "closed":
             return { text: "Advance closed · nothing outstanding", attested: false };
+        case "reserve-escrowed":
+            return {
+                text: `Rolling reserve escrowed · ${fxrp(BigInt(d.fxrpAmount ?? "0"))} FXRP held back at disbursement`,
+                attested: false,
+            };
+        case "reserve-released":
+            return {
+                text: `Reserve released · ${fxrp(BigInt(d.fxrpAmount ?? "0"))} FXRP returned to the borrower`,
+                attested: false,
+            };
+        case "credit-applied":
+            return {
+                text: `Banked credit applied · ${usd(Number(d.usdCents))} settled at origination · ${usd(
+                    Number(d.outstandingCents)
+                )} still owed`,
+                attested: false,
+            };
         default:
             return { text: e.kind, attested: false };
     }

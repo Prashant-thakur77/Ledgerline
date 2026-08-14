@@ -439,6 +439,18 @@ export default function Page() {
             )}
 
             <h2>Prove a period</h2>
+            {periods.length > 0 &&
+                (() => {
+                    const nextAt = Number(periods[periods.length - 1].periodEnd) + 26 * 24 * 60 * 60;
+                    return Date.now() / 1000 < nextAt ? (
+                        <p className="quiet" style={{ marginTop: 0 }}>
+                            This account&apos;s latest period ends {day(periods[periods.length - 1].periodEnd)}.
+                            A period is a month and periods cannot overlap, so the next becomes provable
+                            from <span className="mono">{day(nextAt)}</span>. Another attempt before then is
+                            refused before your wallet ever signs.
+                        </p>
+                    ) : null;
+                })()}
             <ProveRevenue
                 source={view === "stripe" ? "stripe" : "demo"}
                 address={address}
@@ -468,8 +480,9 @@ export default function Page() {
                             revenue at yourself costs more than it frees. Revenue still inside the 120-day
                             refund window is haircut by age before the factor applies, the way a card
                             processor treats fresh settlement, so a just-proven period counts at about
-                            half weight. Every advance repaid in full without delinquency raises the
-                            factor. Every input is on chain.
+                            half weight. Cleanly repaid advances raise the factor once the account has 30
+                            days of attested age; until a creation date is attested, the factor stays at
+                            the base by design. Every input is on chain.
                         </>
                     )}
                 </p>
@@ -754,10 +767,37 @@ export default function Page() {
                     <div className="block">
                         <p style={{ margin: 0 }}>
                             Each newly proven period repays {shareBps ? Number(shareBps) / 100 : 20}% of that
-                            period&apos;s revenue, converted to FXRP at that moment&apos;s rate. Nobody has to
-                            remember to pay; a proven period is the trigger. Prove another period above and watch
-                            the figure fall.
+                            period&apos;s revenue, converted to FXRP at that moment&apos;s rate. A proven period
+                            is the trigger; the button below pulls it.
                         </p>
+                        {periods.length > 0 &&
+                            advance !== undefined &&
+                            periods[periods.length - 1].periodEnd > advance.lastAppliedPeriodEnd && (
+                                <div style={{ marginTop: 14 }}>
+                                    <button
+                                        className="wide"
+                                        disabled={isWriting}
+                                        onClick={() =>
+                                            writeContract(
+                                                {
+                                                    address: MANAGER_ADDRESS,
+                                                    abi: managerAbi,
+                                                    functionName: "applyRevenueRepayment",
+                                                    args: [accountId!],
+                                                    gas: 1_500_000n,
+                                                },
+                                                { onSuccess: () => setTimeout(() => refetchAdvance(), 4000) }
+                                            )
+                                        }
+                                    >
+                                        Apply this period&apos;s {shareBps ? Number(shareBps) / 100 : 20}% repayment
+                                    </button>
+                                    <p className="quiet" style={{ marginTop: 10, marginBottom: 0 }}>
+                                        Pulls the share from your FXRP allowance. Anyone may press this; the
+                                        trigger is the proven period, not the presser.
+                                    </p>
+                                </div>
+                            )}
                     </div>
 
                     {/*
@@ -785,6 +825,9 @@ export default function Page() {
                                 The reference has to be a single memo of exactly that value. The XRP
                                 Ledger&apos;s <span className="mono">InvoiceID</span> field looks like the right
                                 place, but FDC does not read it. Neither leg of this route needs an EVM asset.
+                                One honest note: the FDC Payment proof is then submitted on Flare by any
+                                wallet (the repository ships the script, and we run it for the featured
+                                account); the payer themselves never needs to.
                             </p>
                         </div>
                     )}

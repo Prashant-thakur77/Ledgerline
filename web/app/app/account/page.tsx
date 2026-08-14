@@ -5,7 +5,7 @@ import { useAccount, useDisconnect, useReadContract, useWriteContract } from "wa
 import { AppHeader } from "../../components/AppHeader";
 import { Grain } from "../../components/Chrome";
 import { Connect } from "../../components/Connect";
-import { ORACLE_ADDRESS, MANAGER_ADDRESS, POOL_ADDRESS, FXRP_ADDRESS, oracleAbi, managerAbi, poolAbi, erc20Abi, usd, day, fxrp as fmtFxrp } from "@/lib/contracts";
+import { ORACLE_ADDRESS, MANAGER_ADDRESS, POOL_ADDRESS, FXRP_ADDRESS, SPLITTER_ADDRESS, oracleAbi, managerAbi, poolAbi, erc20Abi, splitterAbi, usd, day, fxrp as fmtFxrp } from "@/lib/contracts";
 
 const STRIPE_ACCOUNT_REF = process.env.NEXT_PUBLIC_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -79,6 +79,9 @@ export default function AccountPage() {
     const { data: walletFxrp } = useReadContract({
         address: FXRP_ADDRESS, abi: erc20Abi, functionName: "balanceOf",
         args: [address!], query: { enabled: Boolean(address), refetchInterval: 15_000 },
+    });
+    const { data: route, refetch: refetchRoute } = useReadContract({
+        address: SPLITTER_ADDRESS, abi: splitterAbi, functionName: "routes", args: [accountId!], ...on,
     });
 
     const isOwner = Boolean(address && owner && owner !== ZERO && owner.toLowerCase() === address.toLowerCase());
@@ -181,6 +184,69 @@ export default function AccountPage() {
                         </div>
                     </>
                 )}
+
+                <h2>Revenue routing</h2>
+                <div className="block">
+                    {route?.[2] ? (
+                        <>
+                            <div className="row">
+                                <span>Splitter lockbox</span>
+                                <span className="mono">
+                                    enrolled · {Number(route[1]) / 100}% of each settlement services the debt
+                                </span>
+                            </div>
+                            <div className="row">
+                                <span>Remainder forwards to</span>
+                                <span className="mono">{route[0].slice(0, 8)}…{route[0].slice(-6)}</span>
+                            </div>
+                            {isOwner && (
+                                <div style={{ marginTop: 12 }}>
+                                    <button
+                                        className="ghost"
+                                        disabled={isPending}
+                                        onClick={() =>
+                                            writeContract({
+                                                address: SPLITTER_ADDRESS, abi: splitterAbi,
+                                                functionName: "unenroll", args: [accountId!], gas: 600_000n,
+                                            }, { onSuccess: () => setTimeout(() => refetchRoute(), 4000) })
+                                        }
+                                    >
+                                        Leave the splitter
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <p style={{ marginTop: 0 }}>
+                                Route this account&apos;s settlements through the on-chain lockbox: 20% of
+                                each arrival services any open debt automatically, the rest forwards to your
+                                wallet in the same transaction. While the account is delinquent or behind its
+                                repayment floor, the split springs to 100% until it cures. Deduction at
+                                source, the mechanism platform lenders run, as a contract.
+                            </p>
+                            {isOwner ? (
+                                <button
+                                    className="wide"
+                                    disabled={isPending}
+                                    onClick={() =>
+                                        writeContract({
+                                            address: SPLITTER_ADDRESS, abi: splitterAbi,
+                                            functionName: "enroll",
+                                            args: [accountId!, address!, 2000], gas: 600_000n,
+                                        }, { onSuccess: () => setTimeout(() => refetchRoute(), 4000) })
+                                    }
+                                >
+                                    Enroll at 20%
+                                </button>
+                            ) : (
+                                <p className="quiet" style={{ marginBottom: 0 }}>
+                                    Only the account&apos;s bound wallet can enroll.
+                                </p>
+                            )}
+                        </>
+                    )}
+                </div>
 
                 <h2>Custody</h2>
                 <div className="block">
