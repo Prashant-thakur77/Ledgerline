@@ -28,7 +28,7 @@ these six places:**
 | Path | What it is |
 |---|---|
 | [`contracts/ledgerline/`](contracts/ledgerline/) | Six contracts — oracle, manager, lender pool, revenue splitter, private underwriter, governance timelock — all source-verified on chain. |
-| [`test/`](test/) | 162 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 200-step invariant walk. |
+| [`test/`](test/) | 184 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 250-step invariant walk. |
 | [`scripts/ledgerline/`](scripts/ledgerline/) | Deploy, attest, borrow, repay, redeem to XRPL, and a one-screen state dump. |
 | [`web/app/`](web/app/) | The interface, including the live attestation console and its two API routes. |
 | [`web/lib/`](web/lib/) | The Flare protocol layer the browser drives an attestation with. |
@@ -281,7 +281,7 @@ All six current contracts are source-verified on the explorer. Full deployment n
 ```bash
 cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
 yarn install
-yarn hardhat test             # 162 tests
+yarn hardhat test             # 184 tests
 
 # fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
 yarn hardhat run scripts/ledgerline/deploy.ts --network coston2
@@ -381,7 +381,7 @@ Every file listed in [Where the code is](#where-the-code-is) was written from sc
 - **[`AdvanceManager.sol`](contracts/ledgerline/AdvanceManager.sol)** — underwriting, FTSOv2 conversion, the
   FXRP treasury, `requestAdvance`, `requestAdvanceToXrpl`, manual and revenue-triggered repayment, delinquency.
 
-**Tests** — [`test/`](test/), **162 passing**, `npx hardhat test`
+**Tests** — [`test/`](test/), **184 passing**, `npx hardhat test`
 
 Includes a 3x XRP price move asserting the dollar obligation does not change, and a case running the same
 price at 6 and 8 decimals and demanding the same answer. Four mock contracts stub the FDC and FTSO calls that
@@ -440,6 +440,30 @@ video script, and [BLOCKERS.md](docs/BLOCKERS.md) what went wrong and what is st
 - The starter's FDC helpers were **reimplemented for the browser** in [`web/lib/flare.ts`](web/lib/flare.ts):
   the originals depend on Hardhat's runtime and Truffle-style artifacts, so the voting-round arithmetic,
   the registry lookups and the proof retrieval were rewritten against viem to run client-side.
+
+### Built after submission, deploying after judging
+
+The deployed contracts and the site are deliberately frozen through the judging window — every address
+and transaction hash in this README stays checkable. Work since submission lives in this repository as
+**V6** and ships to fresh addresses once judging ends:
+
+- **Refunds arrive attested.** The oracle's DTO carries `refundCents` and `disputeCount` beside net
+  revenue, and `refundRatioBps` computes the latest period's refund ratio against gross — the same base
+  Visa's VAMP monitoring uses. Past 1.5% the revenue-share rate steps up by half, so a refund-heavy
+  month repays faster; past 2.2% the account cannot originate until a cleaner month is proven. The
+  enclave path enforces the same freeze, so private underwriting is not the way around the policy.
+- **The fee splits at source.** Each repayment's fee slice divides 70/20/10 between senior yield, the
+  junior first-loss buffer and the keeper reserve, so the cushion and the watchmen refill from revenue
+  instead of manual top-ups.
+- **A keeper anyone can run** ([`scripts/ledgerline/keeper.ts`](scripts/ledgerline/keeper.ts)): marks
+  delinquency (and takes the tip), declares floor breaches, and sends home reserves whose refund window
+  has lapsed — the three permissionless jobs, in one pass.
+- **A bug the new invariant caught.** Writing down that the manager may hold exactly its keeper reserve
+  plus escrowed rolling reserves exposed a stranding in `writeOff`: a reserve larger than the remaining
+  loss was zeroed on the ledger but only partially paid out. The surplus now returns to the borrower,
+  the way a factoring reserve nets against loss.
+- **CI that proves the build.** The TEE extension is built twice from clean checkouts and the output
+  hashes must match, so the reproducibility claim is enforced, not asserted.
 
 ## Honesty notes
 
@@ -546,10 +570,12 @@ the measurement, not how any of the above is verified.
 **Network.** Coston2, Flare's EVM testnet, chain id 114. The XRP Ledger leg settles on XRPL testnet. Nothing
 is deployed to mainnet and nothing here involves real money.
 
-**Automated tests.** 162, `npx hardhat test`, covering all six contracts. The ones worth naming: a 3x XRP price
+**Automated tests.** 184, `npx hardhat test`, covering all six contracts. The ones worth naming: a 3x XRP price
 move asserting the dollar obligation does not change; the same price supplied at 6 and 8 decimals demanding
-the same answer; replay, account-mismatch, stale-period and wrong-owner guards on the oracle; and the XRPL
-redemption leg against a mock asset manager.
+the same answer; replay, account-mismatch, stale-period and wrong-owner guards on the oracle; the XRPL
+redemption leg against a mock asset manager; a 250-step seeded random walk over every money path with six
+invariants checked after each step; and the attestation jq filters run through the actual jq binary against
+a canned Stripe payload, because the FDC verifiers execute that filter, not us.
 
 **Manually exercised on chain**, not just in tests: attestation from a real authenticated Stripe API call,
 underwriting, an FXRP advance, a revenue-triggered repayment, a FAssets redemption that put real XRP in an
