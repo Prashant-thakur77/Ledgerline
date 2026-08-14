@@ -182,6 +182,23 @@ export const managerAbi = [
     },
     { type: "function", name: "lotSize", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
     { type: "function", name: "keeperReserveFxrp", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+    {
+        type: "function",
+        name: "repay",
+        stateMutability: "nonpayable",
+        inputs: [
+            { name: "accountId", type: "bytes32" },
+            { name: "usdCents", type: "uint256" },
+        ],
+        outputs: [],
+    },
+    {
+        type: "function",
+        name: "releaseReserve",
+        stateMutability: "nonpayable",
+        inputs: [{ name: "accountId", type: "bytes32" }],
+        outputs: [],
+    },
     { type: "function", name: "reserveFxrp", stateMutability: "view", inputs: [{ name: "accountId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
     {
         type: "function",

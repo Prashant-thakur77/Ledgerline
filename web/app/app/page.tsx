@@ -13,9 +13,11 @@ import { flareTestnet } from "wagmi/chains";
 import {
     ORACLE_ADDRESS,
     MANAGER_ADDRESS,
+    FXRP_ADDRESS,
     EXPLORER,
     oracleAbi,
     managerAbi,
+    erc20Abi,
     usd,
     fxrp,
     price,
@@ -195,6 +197,29 @@ export default function Page() {
     }, [accountId]);
 
     const cents = BigInt(Math.round(parseFloat(amount || "0") * 100));
+    const outstanding = advance?.outstandingCents ?? 0n;
+    const { data: repayQuote } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "usdCentsToFxrp",
+        args: [outstanding, xrpUsd!, priceDecimals!],
+        query: { enabled: Boolean(outstanding > 0n && xrpUsd !== undefined), refetchInterval: 15_000 },
+    });
+    const { data: managerAllowance, refetch: refetchManagerAllowance } = useReadContract({
+        address: FXRP_ADDRESS,
+        abi: erc20Abi,
+        functionName: "allowance",
+        args: [address!, MANAGER_ADDRESS],
+        query: { enabled: Boolean(address) },
+    });
+    const { data: reserveHeld, refetch: refetchReserve } = useReadContract({
+        address: MANAGER_ADDRESS,
+        abi: managerAbi,
+        functionName: "reserveFxrp",
+        args: [accountId!],
+        ...on,
+    });
+
     const { data: quoted } = useReadContract({
         address: MANAGER_ADDRESS,
         abi: managerAbi,
@@ -661,6 +686,71 @@ export default function Page() {
                     </div>
 
                     <h2>Repayment</h2>
+                    {/*
+                     * The simplest route first: pay it back. The contract always had `repay`; the interface
+                     * described the automatic routes and forgot the manual one, which is the first thing
+                     * anyone asks for. Approve the exact cost plus a small price-drift buffer, then repay
+                     * in full. Explicit gas because Coston2 under-estimates the pool path.
+                     */}
+                    <div className="block">
+                        <div className="row">
+                            <span>Repay in full, from this wallet</span>
+                            <span className="mono">
+                                {repayQuote !== undefined ? `${fxrp(repayQuote)} FXRP` : "…"} for {usd(outstanding)}
+                            </span>
+                        </div>
+                        <div className="cta" style={{ marginTop: 14 }}>
+                            {(managerAllowance ?? 0n) < ((repayQuote ?? 0n) * 105n) / 100n ? (
+                                <button
+                                    className="wide"
+                                    disabled={isWriting || repayQuote === undefined}
+                                    onClick={() =>
+                                        writeContract(
+                                            {
+                                                address: FXRP_ADDRESS,
+                                                abi: erc20Abi,
+                                                functionName: "approve",
+                                                args: [MANAGER_ADDRESS, ((repayQuote ?? 0n) * 105n) / 100n],
+                                            },
+                                            { onSuccess: () => setTimeout(() => refetchManagerAllowance(), 3000) }
+                                        )
+                                    }
+                                >
+                                    {isWriting ? "Check your wallet…" : "Approve FXRP"}
+                                </button>
+                            ) : (
+                                <button
+                                    className="wide"
+                                    disabled={isWriting || outstanding === 0n}
+                                    onClick={() =>
+                                        writeContract(
+                                            {
+                                                address: MANAGER_ADDRESS,
+                                                abi: managerAbi,
+                                                functionName: "repay",
+                                                args: [accountId!, outstanding],
+                                                gas: 1_500_000n,
+                                            },
+                                            {
+                                                onSuccess: () =>
+                                                    setTimeout(() => {
+                                                        refetchAdvance();
+                                                        refetchReserve();
+                                                    }, 4000),
+                                            }
+                                        )
+                                    }
+                                >
+                                    {isWriting ? "Check your wallet…" : `Repay ${usd(outstanding)} in full`}
+                                </button>
+                            )}
+                        </div>
+                        <p className="quiet" style={{ marginTop: 12, marginBottom: 0 }}>
+                            Priced at this moment&apos;s FTSO rate. Closing clean earns a tier step and frees
+                            the escrowed reserve below.
+                        </p>
+                    </div>
+
                     <div className="block">
                         <p style={{ margin: 0 }}>
                             Each newly proven period repays {shareBps ? Number(shareBps) / 100 : 20}% of that
@@ -698,6 +788,42 @@ export default function Page() {
                             </p>
                         </div>
                     )}
+                </>
+            )}
+
+            {!open && (reserveHeld ?? 0n) > 0n && (
+                <>
+                    <h2>Your reserve</h2>
+                    <div className="block">
+                        <div className="row">
+                            <span>Escrowed on the closed advance</span>
+                            <span className="mono">{fxrp(reserveHeld!)} FXRP</span>
+                        </div>
+                        <div style={{ marginTop: 12 }}>
+                            <button
+                                className="wide"
+                                disabled={isWriting}
+                                onClick={() =>
+                                    writeContract(
+                                        {
+                                            address: MANAGER_ADDRESS,
+                                            abi: managerAbi,
+                                            functionName: "releaseReserve",
+                                            args: [accountId!],
+                                            gas: 800_000n,
+                                        },
+                                        { onSuccess: () => setTimeout(() => refetchReserve(), 4000) }
+                                    )
+                                }
+                            >
+                                Release the reserve to your wallet
+                            </button>
+                        </div>
+                        <p className="quiet" style={{ marginTop: 12, marginBottom: 0 }}>
+                            The advance closed clean, so the held-back 10% is yours again. Anyone may press
+                            this; it only ever pays the borrower.
+                        </p>
+                    </div>
                 </>
             )}
 
