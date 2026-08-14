@@ -5,7 +5,7 @@ import { useAccount, useDisconnect, useReadContract, useWriteContract } from "wa
 import { AppHeader } from "../../components/AppHeader";
 import { Grain } from "../../components/Chrome";
 import { Connect } from "../../components/Connect";
-import { ORACLE_ADDRESS, MANAGER_ADDRESS, oracleAbi, managerAbi, usd, day } from "@/lib/contracts";
+import { ORACLE_ADDRESS, MANAGER_ADDRESS, POOL_ADDRESS, FXRP_ADDRESS, oracleAbi, managerAbi, poolAbi, erc20Abi, usd, day, fxrp as fmtFxrp } from "@/lib/contracts";
 
 const STRIPE_ACCOUNT_REF = process.env.NEXT_PUBLIC_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -64,6 +64,21 @@ export default function AccountPage() {
     });
     const { data: limit } = useReadContract({
         address: MANAGER_ADDRESS, abi: managerAbi, functionName: "advanceLimitCents", args: [accountId!], ...on,
+    });
+    const { data: reserveHeld } = useReadContract({
+        address: MANAGER_ADDRESS, abi: managerAbi, functionName: "reserveFxrp", args: [accountId!], ...on,
+    });
+    const { data: poolShares } = useReadContract({
+        address: POOL_ADDRESS, abi: poolAbi, functionName: "balanceOf",
+        args: [address!], query: { enabled: Boolean(address), refetchInterval: 15_000 },
+    });
+    const { data: poolValue } = useReadContract({
+        address: POOL_ADDRESS, abi: poolAbi, functionName: "convertToAssets",
+        args: [poolShares!], query: { enabled: Boolean(poolShares && poolShares > 0n), refetchInterval: 15_000 },
+    });
+    const { data: walletFxrp } = useReadContract({
+        address: FXRP_ADDRESS, abi: erc20Abi, functionName: "balanceOf",
+        args: [address!], query: { enabled: Boolean(address), refetchInterval: 15_000 },
     });
 
     const isOwner = Boolean(address && owner && owner !== ZERO && owner.toLowerCase() === address.toLowerCase());
@@ -125,6 +140,10 @@ export default function AccountPage() {
                         <span className="mono">{limit !== undefined ? usd(Number(limit)) : "…"}</span>
                     </div>
                     <div className="row">
+                        <span>Reserve escrowed on the open advance</span>
+                        <span className="mono">{reserveHeld !== undefined ? `${fmtFxrp(reserveHeld)} FXRP` : "…"}</span>
+                    </div>
+                    <div className="row">
                         <span>Attested account age</span>
                         <span className="mono">
                             {createdAt === undefined ? "…" : Number(createdAt) === 0 ? "not attested" : `since ${day(Number(createdAt))}`}
@@ -136,6 +155,32 @@ export default function AccountPage() {
                         at the base regardless of history, which is what makes the tier expensive to fake.
                     </p>
                 </div>
+
+                {isConnected && (
+                    <>
+                        <h2>Your position</h2>
+                        <div className="block">
+                            <div className="row">
+                                <span>FXRP in your wallet</span>
+                                <span className="mono">{walletFxrp !== undefined ? `${fmtFxrp(walletFxrp)} FXRP` : "…"}</span>
+                            </div>
+                            <div className="row">
+                                <span>Lender pool shares</span>
+                                <span className="mono">{poolShares !== undefined ? poolShares.toString() : "…"}</span>
+                            </div>
+                            <div className="row">
+                                <span>Their value, at the current share price</span>
+                                <span className="mono">
+                                    {poolShares === 0n ? "0 FXRP" : poolValue !== undefined ? `${fmtFxrp(poolValue)} FXRP` : "…"}
+                                </span>
+                            </div>
+                            <p className="quiet" style={{ marginTop: 12, marginBottom: 0 }}>
+                                Both sides of the book in one place: what you owe and hold as a borrower
+                                above, what you have staked as a lender here.
+                            </p>
+                        </div>
+                    </>
+                )}
 
                 <h2>Custody</h2>
                 <div className="block">

@@ -40,6 +40,14 @@ export default function LendPage() {
 
                 <Lend />
 
+                <p className="quiet" style={{ marginTop: 18 }}>
+                    Need FXRP? It is minted from real XRP through{" "}
+                    <a href="https://dev.flare.network/fassets/minting" target="_blank" rel="noreferrer">
+                        FAssets
+                    </a>
+                    . This app spends and redeems it; minting lives with the protocol itself.
+                </p>
+
                 <h2>What you are underwriting</h2>
                 <div className="block">
                     <p>

@@ -5,6 +5,7 @@ import { AppHeader } from "../../components/AppHeader";
 import { Grain } from "../../components/Chrome";
 import { Mechanism } from "../../components/Mechanism";
 import { ProtocolStrip, ActivityFeed } from "../../components/Activity";
+import { TwoLedgers } from "../../components/TwoLedgers";
 import { EXPLORER, ORACLE_ADDRESS, MANAGER_ADDRESS, oracleAbi } from "@/lib/contracts";
 
 const STRIPE_ACCOUNT_REF = process.env.NEXT_PUBLIC_ACCOUNT_REF ?? "acct_1U2HbaRh1zuX9OfD";
@@ -43,6 +44,9 @@ export default function ActivityPage() {
                 </p>
 
                 <ProtocolStrip />
+
+                <h2>Both ledgers, right now</h2>
+                <TwoLedgers />
 
                 <h2>The featured account&apos;s history</h2>
                 <ActivityFeed accountId={accountId as `0x${string}` | undefined} />

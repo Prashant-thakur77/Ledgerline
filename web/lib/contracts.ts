@@ -181,6 +181,8 @@ export const managerAbi = [
         outputs: [{ type: "uint256" }],
     },
     { type: "function", name: "lotSize", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+    { type: "function", name: "keeperReserveFxrp", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+    { type: "function", name: "reserveFxrp", stateMutability: "view", inputs: [{ name: "accountId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
     {
         type: "function",
         name: "fxrpToUsdCents",
