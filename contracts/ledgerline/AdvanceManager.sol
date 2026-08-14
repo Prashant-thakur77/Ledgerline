@@ -671,7 +671,10 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             if (!advance.delinquent) closedCleanCycles[accountId] += 1;
         }
 
-        _collectAndDistribute(accountId, advance, msg.sender, toDebt, fxrpAmount, closed);
+        // Only the slice that services the debt carries fee content; the overpayment beyond it is
+        // the borrower's own money passing through to credit, and the split must not tax it.
+        uint256 fxrpForDebt = (fxrpAmount * toDebt) / usdValue;
+        _collectAndDistribute(accountId, advance, msg.sender, toDebt, fxrpAmount, fxrpForDebt, closed);
 
         uint256 toCredit = usdValue - toDebt;
         if (toCredit > 0) {
@@ -737,7 +740,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             if (!advance.delinquent) closedCleanCycles[accountId] += 1;
         }
 
-        _collectAndDistribute(accountId, advance, borrower, usdCents, fxrpAmount, closed);
+        _collectAndDistribute(accountId, advance, borrower, usdCents, fxrpAmount, fxrpAmount, closed);
 
         emit Repaid(
             accountId, borrower, usdCents, fxrpAmount, price, priceDecimals, advance.outstandingCents, automatic
@@ -760,13 +763,16 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         address payer,
         uint256 usdCents,
         uint256 fxrpAmount,
+        uint256 fxrpForDebt,
         bool closed
     ) internal {
         fxrp.safeTransferFrom(payer, address(this), fxrpAmount);
 
-        // The fee's pro-rata slice of this payment, in FXRP.
+        // The fee's pro-rata slice of the debt-servicing portion, in FXRP. `fxrpForDebt` is the
+        // whole payment on the direct rails; on the third-party rail it excludes any overpayment
+        // that banks as credit, which carries no fee content.
         uint256 owedAtOpen = advance.principalCents + advance.feeCents;
-        uint256 fxrpFee = owedAtOpen == 0 ? 0 : (fxrpAmount * advance.feeCents) / owedAtOpen;
+        uint256 fxrpFee = owedAtOpen == 0 ? 0 : (fxrpForDebt * advance.feeCents) / owedAtOpen;
         uint256 juniorCut = (fxrpFee * juniorFeeBps) / 10_000;
         uint256 keeperCut = (fxrpFee * keeperFeeBps) / 10_000;
 

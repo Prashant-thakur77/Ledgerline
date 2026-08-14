@@ -124,6 +124,21 @@ describe("The fee split, at source", () => {
         expect((await fxrp.balanceOf(stranger.address)) - before).to.equal(5_000_000n); // the tip
     });
 
+    it("splits only what services the debt: an overpayment's credit is not taxed", async () => {
+        const { borrower, manager, pool, accountId } = await setup();
+        await manager.connect(borrower).requestAdvance(accountId, 100_000n); // owes $1,050
+
+        // $1,500 arrives through the third-party rail: $1,050 closes the debt, $450 banks as credit.
+        await manager.connect(borrower).repayFxrpFor(accountId, 1_500_000_000n);
+        expect(await manager.creditCents(accountId)).to.equal(45_000n);
+
+        // The fee slice must be computed on the $1,050 that serviced the debt — the whole $50 fee —
+        // and not on the $450 of credit, which is the borrower's own money passing through.
+        expect(await pool!.juniorAssets()).to.equal(10_000_000n); // 20% of $50, not 20% of $71.43
+        expect(await manager.keeperReserveFxrp()).to.equal(5_000_000n);
+        expect((await manager.advanceOf(accountId)).open).to.equal(false);
+    });
+
     it("treasury mode takes only the keeper cut", async () => {
         const { borrower, manager, accountId } = await setup({ pool: false });
         await manager.connect(borrower).requestAdvance(accountId, 100_000n);
