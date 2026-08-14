@@ -440,8 +440,11 @@ export default function Page() {
                                 <> after {Number(cleanCycles)} cleanly repaid advance{Number(cleanCycles) === 1 ? "" : "s"}</>
                             )}
                             . New accounts start at 2.5%, deliberately below card-processing fees so faking
-                            revenue at yourself costs more than it frees. Every advance repaid in full
-                            without delinquency raises it. Every input is on chain.
+                            revenue at yourself costs more than it frees. Revenue still inside the 120-day
+                            refund window is haircut by age before the factor applies, the way a card
+                            processor treats fresh settlement, so a just-proven period counts at about
+                            half weight. Every advance repaid in full without delinquency raises the
+                            factor. Every input is on chain.
                         </>
                     )}
                 </p>

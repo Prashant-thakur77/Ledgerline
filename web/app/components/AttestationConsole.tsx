@@ -20,7 +20,7 @@ function Countdown({ to }: { to: number }) {
         const t = setInterval(() => setLeft(Math.max(0, to - Math.floor(Date.now() / 1000))), 1000);
         return () => clearInterval(t);
     }, [to]);
-    return <span>{left > 0 ? `${left}s` : "closed"}</span>;
+    return <span>{left > 0 ? `${left}s` : "a moment"}</span>;
 }
 
 export function AttestationConsole({ log, phase }: { log: LogLine[]; phase: Phase }) {
