@@ -1,7 +1,7 @@
 # Proofline
 
-*(Ledgerline in the code: the contracts, scripts and package names keep the working name so nothing on
-chain or in the history has to be re-verified for a rebrand.)*
+*(Ledgerline in the code: the contract and script paths keep the working name so nothing on chain or in
+the history has to be re-verified for a rebrand.)*
 
 **Advances against revenue your payment processor already proves.**
 
@@ -28,7 +28,7 @@ these six places:**
 | Path | What it is |
 |---|---|
 | [`contracts/ledgerline/`](contracts/ledgerline/) | Six contracts — oracle, manager, lender pool, revenue splitter, private underwriter, governance timelock — all source-verified on chain. |
-| [`test/`](test/) | 184 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 250-step invariant walk. |
+| [`test/`](test/) | 188 tests: both money paths, the tier economics (with a recycling-attack simulation), the lender pool, the private underwriter, and a 250-step invariant walk. |
 | [`scripts/ledgerline/`](scripts/ledgerline/) | Deploy, attest, borrow, repay, redeem to XRPL, and a one-screen state dump. |
 | [`web/app/`](web/app/) | The interface, including the live attestation console and its two API routes. |
 | [`web/lib/`](web/lib/) | The Flare protocol layer the browser drives an attestation with. |
@@ -145,7 +145,8 @@ from the received XRP through FAssets, which is the production answer and is not
 ### And the rest of that debt repaid itself
 
 The $5.51 left over was settled the product's own way: a newly proven period triggered the repayment, with
-nobody deciding to pay. Run against the current contracts.
+nobody deciding to pay. Run against the same generation as the XRPL leg above, since superseded by the
+current deployment below.
 
 | | |
 |---|---|
@@ -153,10 +154,9 @@ nobody deciding to pay. Run against the current contracts.
 | `applyRevenueRepayment` took the agreed share, priced at $1.015481 | [`0x00d740b7…`](https://coston2-explorer.flare.network/tx/0x00d740b78e9c84b4cb6b434c560fb44d9c8f00c00c29b288eecc4960841f067e) |
 | Owed | **$5.51 → $0** · advance closed |
 
-So the one advance issued on the current deployment was repaid through **both** channels the product has:
-first from the XRP Ledger with an FDC Payment proof, then the remainder automatically from newly attested
-revenue. The treasury holds ~9.4 FXRP and the demo account is clean — connect a wallet and the full loop is
-open to anyone.
+So that advance was repaid through **both** channels the product has: first from the XRP Ledger with an FDC
+Payment proof, then the remainder automatically from newly attested revenue. The current deployment has since
+run its own full cycle — advance, splitter deduction, repayment, reserve release — recorded under *V5* below.
 
 ### Checking these claims
 
@@ -281,7 +281,7 @@ All six current contracts are source-verified on the explorer. Full deployment n
 ```bash
 cp .env.example .env          # add PRIVATE_KEY, and STRIPE_API_KEY if attesting Stripe
 yarn install
-yarn hardhat test             # 184 tests
+yarn hardhat test             # 188 tests
 
 # fund a wallet at https://faucet.flare.network/coston2 — 100 C2FLR, 10 FXRP per day
 yarn hardhat run scripts/ledgerline/deploy.ts --network coston2
@@ -381,7 +381,7 @@ Every file listed in [Where the code is](#where-the-code-is) was written from sc
 - **[`AdvanceManager.sol`](contracts/ledgerline/AdvanceManager.sol)** — underwriting, FTSOv2 conversion, the
   FXRP treasury, `requestAdvance`, `requestAdvanceToXrpl`, manual and revenue-triggered repayment, delinquency.
 
-**Tests** — [`test/`](test/), **184 passing**, `npx hardhat test`
+**Tests** — [`test/`](test/), **188 passing**, `npx hardhat test`
 
 Includes a 3x XRP price move asserting the dollar obligation does not change, and a case running the same
 price at 6 and 8 decimals and demanding the same answer. Four mock contracts stub the FDC and FTSO calls that
@@ -570,7 +570,7 @@ the measurement, not how any of the above is verified.
 **Network.** Coston2, Flare's EVM testnet, chain id 114. The XRP Ledger leg settles on XRPL testnet. Nothing
 is deployed to mainnet and nothing here involves real money.
 
-**Automated tests.** 184, `npx hardhat test`, covering all six contracts. The ones worth naming: a 3x XRP price
+**Automated tests.** 188, `npx hardhat test`, covering all six contracts. The ones worth naming: a 3x XRP price
 move asserting the dollar obligation does not change; the same price supplied at 6 and 8 decimals demanding
 the same answer; replay, account-mismatch, stale-period and wrong-owner guards on the oracle; the XRPL
 redemption leg against a mock asset manager; a 250-step seeded random walk over every money path with six

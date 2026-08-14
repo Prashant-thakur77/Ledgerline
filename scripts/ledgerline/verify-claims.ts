@@ -3,8 +3,9 @@ import fs from "fs";
 import path from "path";
 
 /**
- * Checks that every transaction hash this repository claims actually exists on chain, succeeded, and was
- * sent to a contract we say it was sent to.
+ * Checks that every transaction hash this repository claims actually exists on chain, succeeded, was sent
+ * to a contract we say it was sent to, and — where a passage says "the current deployment" — actually
+ * touched the current deployment rather than a superseded one.
  *
  * This exists because the most common way a hackathon submission loses credibility is a README that claims
  * more than the chain can back. Anyone reviewing this can run it and see for themselves:
@@ -48,6 +49,38 @@ const NAMED: Record<string, string> = {
     "0x48aC463d7975828989331F4De43341627b9c5f1D": "FdcHub",
 };
 
+/** The generation a reader means when a passage says "current". */
+const CURRENT = new Set(
+    [
+        "0x4516155F9069205C6EC982214528a62973477767",
+        "0x1187B737EFef8C1D2563C0001553Bf6E7afe25af",
+        "0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296",
+        "0xf7982B48D4005F2aa5b2d7AE030996D1d19eD727",
+        "0x66cB73a6326F7e6541DA95f5fB2236d8b4f4fc4a",
+        "0x10eBCE7B70f859E3754832862A34B1B0fE45C37A",
+    ].map((a) => a.toLowerCase())
+);
+
+/**
+ * The subtler failure this script now catches. A passage that says "run against the current contracts"
+ * above a table of hashes is making a claim about WHICH deployment those hashes touched, and that claim
+ * rots silently every time the contracts are redeployed: the hashes still resolve, still succeeded, and
+ * still point at a real contract — just the wrong generation. It is exactly the kind of thing a reader
+ * checks by clicking one link, so it has to be checked here first.
+ *
+ * The window is read as one passage rather than line by line: a sentence like "superseded by the current
+ * deployment below" wraps across lines, and a line-at-a-time reader would see "current" on the second line
+ * and never reach "superseded" on the first. History wins wherever both appear.
+ */
+const CURRENCY_MARKERS = /\b(current contracts|current deployment|currently deployed)\b/i;
+const HISTORY_MARKERS = /\b(superseded|then-current|earlier deployment|that generation|predates)\b/i;
+
+function claimsCurrent(lines: string[], lineIndex: number): boolean {
+    const window = lines.slice(Math.max(0, lineIndex - 11), lineIndex + 1).join(" ");
+    if (HISTORY_MARKERS.test(window)) return false;
+    return CURRENCY_MARKERS.test(window);
+}
+
 async function main() {
     /*
      * Only hashes published as explorer transaction links are treated as claims that a transaction exists.
@@ -57,13 +90,19 @@ async function main() {
     const TX_LINK = /coston2-explorer\.flare\.network\/tx\/(0x[0-9a-fA-F]{64})/g;
 
     const claimed = new Map<string, string[]>();
+    const claimedCurrent = new Map<string, string>();
     for (const file of FILES) {
         const full = path.join(ROOT, file);
         if (!fs.existsSync(full)) continue;
         const text = fs.readFileSync(full, "utf8");
+        const lines = text.split("\n");
         for (const m of text.matchAll(TX_LINK)) {
             const hash = m[1].toLowerCase();
             claimed.set(hash, [...(claimed.get(hash) ?? []), file]);
+            const lineIndex = text.slice(0, m.index).split("\n").length - 1;
+            if (claimsCurrent(lines, lineIndex)) {
+                claimedCurrent.set(hash, `${file}:${lineIndex + 1}`);
+            }
         }
     }
 
@@ -87,14 +126,21 @@ async function main() {
         if (receipt.status !== 1) bad++;
         console.log(`  ${status}  ${hash.slice(0, 12)}…  block ${receipt.blockNumber}  to ${label}`);
         console.log(`          cited in ${where}`);
+
+        const currentClaim = claimedCurrent.get(hash);
+        if (currentClaim && receipt.to && !CURRENT.has(receipt.to.toLowerCase())) {
+            console.log(`  STALE   ${hash.slice(0, 12)}… is presented as current at ${currentClaim},`);
+            console.log(`          but it was sent to ${label} — a superseded generation`);
+            bad++;
+        }
     }
 
     console.log();
     if (bad > 0) {
-        console.log(`${bad} claimed hash(es) are not confirmed successful transactions. Fix the docs.\n`);
+        console.log(`${bad} claim(s) are not supported by the chain. Fix the docs.\n`);
         process.exitCode = 1;
     } else {
-        console.log("Every claimed transaction exists on chain and succeeded.\n");
+        console.log("Every claimed transaction exists, succeeded, and sits in the generation it is claimed for.\n");
     }
 }
 
