@@ -190,6 +190,7 @@ export async function GET(request: Request) {
     const advances = rows.filter((r) => r.kind === "advance");
     const provenCents = proven.reduce((s, r) => s + Number(r.data.revenueCents ?? 0), 0);
     const advancedCents = advances.reduce((s, r) => s + Number(r.data.principalCents ?? 0), 0);
+    const feesCents = advances.reduce((s, r) => s + Number(r.data.feeCents ?? 0), 0);
     const repaidCents =
         rows.filter((r) => r.kind === "repaid").reduce((s, r) => s + Number(r.data.usdCents ?? 0), 0) +
         rows.filter((r) => r.kind === "repaid-xrpl").reduce((s, r) => s + Number(r.data.usdCents ?? 0), 0);
@@ -200,6 +201,7 @@ export async function GET(request: Request) {
         provenCents,
         advances: advances.length,
         advancedCents,
+        feesCents,
         repaidCents,
         events: rows.length,
     };

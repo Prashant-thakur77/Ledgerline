@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
-import { FXRP_ADDRESS, POOL_ADDRESS, EXPLORER, poolAbi, erc20Abi, fxrp } from "@/lib/contracts";
+import { FXRP_ADDRESS, POOL_ADDRESS, EXPLORER, poolAbi, erc20Abi, fxrp, usd } from "@/lib/contracts";
 
 /**
  * The lender side, on screen.
@@ -33,6 +33,22 @@ export function Lend() {
     const { data: capBps } = useReadContract({
         address: POOL_ADDRESS, abi: poolAbi, functionName: "utilisationCapBps",
     });
+    // What one share is worth, in assets: the number that rises as fees land.
+    const { data: sharePrice } = useReadContract({
+        address: POOL_ADDRESS, abi: poolAbi, functionName: "convertToAssets",
+        args: [1_000_000_000n], ...every,
+    });
+    const [feesCents, setFeesCents] = useState<number | null>(null);
+    useEffect(() => {
+        let gone = false;
+        void (async () => {
+            try {
+                const d = await fetch("/api/activity").then((r) => r.json());
+                if (!gone && d?.stats?.feesCents !== undefined) setFeesCents(d.stats.feesCents);
+            } catch { /* the row stays quiet */ }
+        })();
+        return () => { gone = true; };
+    }, []);
     const { data: shares, refetch: refetchShares } = useReadContract({
         address: POOL_ADDRESS, abi: poolAbi, functionName: "balanceOf",
         args: [address!], query: { enabled: Boolean(address), refetchInterval: 15_000 },
@@ -79,6 +95,14 @@ export function Lend() {
                 <span>Utilisation cap</span>
                 <span className="mono">{capBps !== undefined ? `${Number(capBps) / 100}%` : "…"}</span>
             </div>
+            <div className="row">
+                <span>Share price, in FXRP per 1,000 shares</span>
+                <span className="mono">{sharePrice !== undefined ? fxrp(sharePrice) : "…"}</span>
+            </div>
+            <div className="row">
+                <span>Fees charged to borrowers, lifetime</span>
+                <span className="mono">{feesCents !== null ? usd(feesCents) : "…"}</span>
+            </div>
 
             {isConnected && (shares ?? 0n) > 0n && (
                 <div className="row">
@@ -91,8 +115,10 @@ export function Lend() {
             )}
 
             <p className="quiet" style={{ marginTop: 14 }}>
-                Deposits earn the origination fees and repayment flow of every advance, and absorb write-offs
-                the same way: in the share price, visibly. Two things to know before depositing: the pool
+                Lenders are repaid more than they put in, by construction: every advance returns its
+                principal plus its fee into the pool, and only the principal leaves the books, so the fee
+                lands in the share price above. No interest and no lockups; the yield is per repaid cycle,
+                the way revenue-based finance actually prices. Two things to know before depositing: the pool
                 holds FXRP against dollar-denominated debts, so <strong>you carry XRP/USD drift</strong>{" "}
                 between disbursement and repayment; and a repayment made on the XRP Ledger{" "}
                 <strong>dips the share price</strong> until the operator re-mints that XRP and returns it.

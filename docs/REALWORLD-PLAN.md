@@ -171,6 +171,14 @@ reserve released on a clean close, and the age haircut is visible in the advance
 in Phase A: the net-revenue attestation schema (DTO change), reproducible TS build CI, and the Stripe
 read-only App registration.
 
+**Between A and B — the fee split (V6, contract change):** today 100% of every origination fee
+lands in the senior share price. The mature design splits it at source: ~70% to senior LPs,
+~20% auto-replenishing the junior first-loss buffer, ~10% to the keeper reserve — so the
+cushion and the watchmen refill from revenue instead of manual top-ups. Deliberately NOT
+time-based interest: the fixed-fee-plus-revenue-share shape is what keeps the advance a
+purchase of receivables rather than a loan (§3), and duration risk is already bounded by the
+floor curve and the springing term.
+
 **Phase B — vendors + ops (~90 days, low 💰):** KYB/UBO credential · Plaid triangle +
 cash-flow adapter · device intelligence · GCP Confidential Space + attestation-gated KMS ·
 self-funding keeper service · Shopify adapter · dual-vault FX split · named delegate with junior
