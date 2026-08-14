@@ -40,9 +40,13 @@ const config: HardhatUserConfig = {
                 version: "0.8.25",
                 settings: {
                     evmVersion: "cancun",
+                    // The IR pipeline plus size-oriented optimization: AdvanceManager crossed the
+                    // EIP-170 24,576-byte limit at runs=200 as V6 grew, and a contract that cannot
+                    // deploy is not a contract.
+                    viaIR: true,
                     optimizer: {
                         enabled: true,
-                        runs: 200,
+                        runs: 1,
                     },
                 },
             },

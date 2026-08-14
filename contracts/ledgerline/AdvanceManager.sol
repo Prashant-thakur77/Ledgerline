@@ -425,9 +425,27 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
 
     // ---------------------------------------------------------------- advances
 
+    /**
+     * @dev A new origination settles the previous advance's escrow first. The prior advance is
+     * necessarily closed and clean here (open or delinquent both block origination), which is
+     * exactly the release predicate — and without this, the new escrow would overwrite the old
+     * ledger entry and strand the borrower's money on this contract forever.
+     */
+    function _settlePriorReserve(bytes32 accountId) internal {
+        uint256 prior = reserveFxrp[accountId];
+        if (prior == 0) return;
+        Advance storage advance = _advances[accountId];
+        if (advance.open) return;
+        reserveFxrp[accountId] = 0;
+        address borrower = oracle.accountOwner(accountId);
+        fxrp.safeTransfer(borrower, prior);
+        emit ReserveReleased(accountId, borrower, prior);
+    }
+
     /// @notice Take an advance in FXRP, on Flare. Pausable: originations stop, repayments never do.
     function requestAdvance(bytes32 accountId, uint256 usdCents) external nonReentrant whenNotPaused {
         if (usdCents == 0) revert InvalidAmount();
+        _settlePriorReserve(accountId);
 
         (uint256 price, int8 priceDecimals) = _xrpUsdFresh();
 
@@ -451,7 +469,10 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             fxrp.safeTransfer(borrower, fxrpAmount - reserved);
         }
         if (reserved > 0) {
-            reserveFxrp[accountId] = reserved;
+            // Accumulate rather than assign: _settlePriorReserve has already sent any prior escrow
+            // home, so this is normally an assignment — but if a future path ever skips the settle,
+            // accumulation degrades to locked-until-release instead of silently orphaned.
+            reserveFxrp[accountId] += reserved;
             emit ReserveEscrowed(accountId, reserved);
         }
 
@@ -470,10 +491,17 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         if (amount == 0) revert InvalidAmount();
         Advance storage advance = _advances[accountId];
 
-        bool closedClean = !advance.open && !advance.delinquent;
+        /*
+         * Any closed advance releases: the debt is settled — repaid in full, or written off, where
+         * the write-off already consumed what the reserve owed and zeroed the rest. Delinquency is
+         * a mark against history, not a lien on money whose obligation no longer exists. While the
+         * advance is open, the reserve stays put as collateral unless the account is current and
+         * the refund window has fully passed.
+         */
+        bool closedSettled = !advance.open;
         bool windowPassed = !advance.delinquent
             && block.timestamp > uint256(advance.openedAt) + refundWindowSeconds;
-        if (!closedClean && !windowPassed) revert ReserveNotReleasable();
+        if (!closedSettled && !windowPassed) revert ReserveNotReleasable();
 
         reserveFxrp[accountId] = 0;
         address borrower = oracle.accountOwner(accountId);
@@ -500,6 +528,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         string calldata xrplAddress
     ) external nonReentrant whenNotPaused {
         if (lots == 0) revert InvalidAmount();
+        _settlePriorReserve(accountId);
         if (bytes(xrplAddress).length == 0) revert InvalidXrplAddress();
 
         IFAssetRedeemer redeemer = assetManager;
@@ -631,14 +660,21 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         advance.outstandingCents -= applied;
         emit CreditApplied(accountId, applied, advance.outstandingCents);
 
-        if (advance.outstandingCents == 0) {
-            advance.open = false;
-            if (address(pool) != address(0)) {
-                uint256 retired = _retire(accountId, advance, applied, true);
-                pool.onRepayment(0, retired);
-            }
-            emit AdvanceClosed(accountId);
+        bool closed = advance.outstandingCents == 0;
+        if (closed) advance.open = false;
+
+        /*
+         * Credit retires principal the moment it settles debt, partial or not. The loan is already
+         * on the pool's books here (credit applies only after the lend), and deferring a partial
+         * application's retirement would leave a bulge that lands on the share price at close —
+         * a debt the books forgot until the last payment was asked to carry it.
+         */
+        if (address(pool) != address(0)) {
+            uint256 retired = _retire(accountId, advance, applied, closed);
+            pool.onRepayment(0, retired);
         }
+
+        if (closed) emit AdvanceClosed(accountId);
     }
 
     /// @notice Repay a dollar amount by hand, priced in FXRP at the current rate.

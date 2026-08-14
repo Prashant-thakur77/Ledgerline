@@ -8,7 +8,9 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
  *
  * A seeded pseudo-random walk over every money path in pool mode — advances, partial and full FXRP
  * repayments, XRPL repayments with overpayment, credit consumption, delinquency and write-off — with the
- * books checked after every single step. The seed is fixed, so a failure replays exactly.
+ * books checked after every single step. The seed is fixed, so a failure replays exactly. A write-off
+ * ends one account's story, not the walk: a fresh account rotates in and the pool-level invariants
+ * carry straight across, the way a real book outlives any one borrower.
  *
  * The V6 walk also carries refunds: attested periods sometimes refund at warn level (the share steps up)
  * or freeze level (origination must revert), revenue-share application runs against a JS mirror of the
@@ -45,10 +47,10 @@ function makeRng(seed: number) {
     };
 }
 
-function revenueProof(revenueCents: number, periodStart: number, periodEnd: number, refundCents = 0) {
+function revenueProof(ref: string, revenueCents: number, periodStart: number, periodEnd: number, refundCents = 0) {
     const abiEncodedData = coder.encode(
         [DTO_TYPE],
-        [["stripe", REF, revenueCents, periodStart, periodEnd, refundCents, 0]]
+        [["stripe", ref, revenueCents, periodStart, periodEnd, refundCents, 0]]
     );
     return {
         merkleProof: [],
@@ -121,9 +123,11 @@ describe("Invariants under a random walk", () => {
         await fxrp.mint(borrower.address, 100_000_000_000n);
         await fxrp.connect(borrower).approve(await manager.getAddress(), 100_000_000_000n);
 
-        const accountId = await oracle.accountIdFor("stripe", REF);
+        let ref = REF;
+        let accountId = await oracle.accountIdFor("stripe", ref);
+        let generation = 0;
         let periodEnd = JAN + MONTH;
-        await oracle.connect(borrower).submitAttestation(accountId, revenueProof(400_000, JAN, periodEnd));
+        await oracle.connect(borrower).submitAttestation(accountId, revenueProof(ref, 400_000, JAN, periodEnd));
 
         const poolAddr = await pool.getAddress();
         const managerAddr = await manager.getAddress();
@@ -172,9 +176,16 @@ describe("Invariants under a random walk", () => {
             lastPrice = price;
             expectDip = false;
 
-            // I6 — the manager strands nothing: every FXRP it holds is on a named ledger.
+            // I6 — the manager strands nothing: every FXRP it holds is on a named ledger. With
+            // account rotation, that means the keeper reserve plus EVERY generation's escrow, since
+            // a retired account's reserve is still someone's money until it is released.
+            let escrowed = 0n;
+            for (let g = 0; g <= generation; g++) {
+                const id = await oracle.accountIdFor("stripe", g === 0 ? REF : `${REF}-${g}`);
+                escrowed += await manager.reserveFxrp(id);
+            }
             expect(await fxrp.balanceOf(managerAddr), `I6 @ ${tag}`).to.equal(
-                (await manager.keeperReserveFxrp()) + (await manager.reserveFxrp(accountId))
+                (await manager.keeperReserveFxrp()) + escrowed
             );
         }
 
@@ -185,7 +196,7 @@ describe("Invariants under a random walk", () => {
             const net = 400_000 - refundCents;
             const start = periodEnd;
             periodEnd = start + MONTH;
-            await oracle.connect(borrower).submitAttestation(accountId, revenueProof(net, start, periodEnd, refundCents));
+            await oracle.connect(borrower).submitAttestation(accountId, revenueProof(ref, net, start, periodEnd, refundCents));
             latestRatioBps = (BigInt(refundCents) * 10_000n) / 400_000n;
         }
 
@@ -193,6 +204,7 @@ describe("Invariants under a random walk", () => {
             const a = await manager.advanceOf(accountId);
             const roll = rng();
             const tag = `step ${step}`;
+
 
             if (!a.open && roll < 0.4) {
                 // Open an advance for a random slice of the limit, if the account is still allowed one.
@@ -209,10 +221,19 @@ describe("Invariants under a random walk", () => {
                 } else {
                     const limit = await manager.advanceLimitCents(accountId);
                     const cents = 1n + BigInt(Math.floor(rng() * Number(limit - 1n)));
-                    await manager.connect(borrower).requestAdvance(accountId, cents);
-                    await time.increase(3600); // spread originations across velocity epochs
-                    // Banked credit may settle part or all of it at origination, off-pool.
-                    if ((await manager.creditCents(accountId)) >= 0n) expectDip = true;
+                    // Deep walks legitimately drain idle liquidity into receivables and write-offs;
+                    // an origination the pool cannot fund must say so, not underwrite thin air.
+                    if (cents * 10_000n > (await manager.availableFunds())) {
+                        await expect(
+                            manager.connect(borrower).requestAdvance(accountId, cents),
+                            `illiquid @ ${tag}`
+                        ).to.be.revertedWithCustomError(manager, "InsufficientTreasury");
+                    } else {
+                        await manager.connect(borrower).requestAdvance(accountId, cents);
+                        await time.increase(3600); // spread originations across velocity epochs
+                        // Banked credit may settle part or all of it at origination, off-pool.
+                        if ((await manager.creditCents(accountId)) >= 0n) expectDip = true;
+                    }
                 }
             } else if (!a.open && !a.delinquent && roll < 0.5 && (await manager.reserveFxrp(accountId)) > 0n) {
                 // A closed-clean reserve goes home, straight from manager escrow — the pool untouched.
@@ -251,6 +272,10 @@ describe("Invariants under a random walk", () => {
                 // Let it rot: grace period passes, delinquency lands, sometimes the write-off too.
                 await time.increase(46 * 24 * 60 * 60);
                 await manager.markDelinquent(accountId);
+                // The tip-farming attack, attempted at every delinquency: both triggers stay true
+                // on a marked advance, so only the guard keeps a second mark from paying again.
+                await expect(manager.markDelinquent(accountId), `re-mark @ ${tag}`)
+                    .to.be.revertedWithCustomError(manager, "AccountDelinquent");
                 if (rng() < 0.5) {
                     await time.increase(46 * 24 * 60 * 60);
                     await manager.connect(owner).writeOff(accountId);
@@ -265,9 +290,16 @@ describe("Invariants under a random walk", () => {
 
             await assertInvariants(tag);
 
-            // Delinquency is terminal for borrowing; once written off, end the walk on a final check.
-            if ((await manager.advanceOf(accountId)).delinquent && !(await manager.advanceOf(accountId)).open) {
-                break;
+            // Delinquency is terminal for the account, not for the walk: rotate a fresh account in
+            // and keep going. Pool-level trackers (junior, price, I2) continue across generations.
+            const after = await manager.advanceOf(accountId);
+            if (after.delinquent && !after.open) {
+                generation += 1;
+                ref = `${REF}-${generation}`;
+                accountId = await oracle.accountIdFor("stripe", ref);
+                periodEnd = JAN + MONTH;
+                latestRatioBps = 0n;
+                await oracle.connect(borrower).submitAttestation(accountId, revenueProof(ref, 400_000, JAN, periodEnd));
             }
         }
 
