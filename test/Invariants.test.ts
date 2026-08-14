@@ -10,13 +10,18 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
  * repayments, XRPL repayments with overpayment, credit consumption, delinquency and write-off — with the
  * books checked after every single step. The seed is fixed, so a failure replays exactly.
  *
- * The invariants, stated once and asserted ~200 times:
+ * The V6 walk also carries refunds: attested periods sometimes refund at warn level (the share steps up)
+ * or freeze level (origination must revert), revenue-share application runs against a JS mirror of the
+ * step-up arithmetic, and reserves release when the predicate allows.
+ *
+ * The invariants, stated once and asserted ~250 times:
  *   I1  a closed advance owes nothing:  !open ⇒ outstanding == 0
  *   I2  the pool's books balance:       totalAssets == idle balance + lentFxrp
  *   I3  lending is per-advance honest:  lentFxrp == fxrpDisbursed − fxrpRetired of the one open advance
  *   I4  debt only moves as designed:    outstanding never exceeds principal + fee
  *   I5  the share price never falls except where the design says it must — a write-off, or an XRPL-side
  *       settlement whose value lands off-pool
+ *   I6  the manager strands nothing:    its FXRP balance == keeper reserve + escrowed rolling reserve
  */
 
 const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd,uint256 refundCents,uint256 disputeCount)";
@@ -40,10 +45,10 @@ function makeRng(seed: number) {
     };
 }
 
-function revenueProof(revenueCents: number, periodStart: number, periodEnd: number) {
+function revenueProof(revenueCents: number, periodStart: number, periodEnd: number, refundCents = 0) {
     const abiEncodedData = coder.encode(
         [DTO_TYPE],
-        [["stripe", REF, revenueCents, periodStart, periodEnd, 0, 0]]
+        [["stripe", REF, revenueCents, periodStart, periodEnd, refundCents, 0]]
     );
     return {
         merkleProof: [],
@@ -88,7 +93,7 @@ function paymentProof(drops: bigint, reference: string) {
 }
 
 describe("Invariants under a random walk", () => {
-    it("holds I1–I5 across ~200 randomised money operations (seed 0xF1A4E)", async function () {
+    it("holds I1–I6 across ~250 randomised money operations (seed 0xF1A4E)", async function () {
         this.timeout(120_000);
 
         const [owner, lp, borrower] = await ethers.getSigners();
@@ -121,7 +126,14 @@ describe("Invariants under a random walk", () => {
         await oracle.connect(borrower).submitAttestation(accountId, revenueProof(400_000, JAN, periodEnd));
 
         const poolAddr = await pool.getAddress();
+        const managerAddr = await manager.getAddress();
+        const warnBps = await manager.refundWarnBps();
+        const freezeBps = await manager.refundFreezeBps();
+        const shareBps = await manager.repaymentShareBps();
+
         let expectDip = false; // set by ops whose value lands off-pool, consumed by the price check
+        let juniorMayShrink = false; // only a write-off consumes the buffer
+        let latestRatioBps = 0n; // the JS mirror of refundRatioBps, computed from what we attested
         let lastJunior = 0n;
         let lastPrice = 0n;
 
@@ -135,15 +147,15 @@ describe("Invariants under a random walk", () => {
             expect(a.outstandingCents, `I4 @ ${tag}`).to.be.lte(a.principalCents + a.feeCents);
 
             // I2 — the pool's books balance to its actual holdings: idle plus lent plus the attested
-            // XRPL receivable, minus the junior buffer (zero in this walk, asserted so it stays zero).
+            // XRPL receivable, minus the junior buffer.
             const idle = await fxrp.balanceOf(poolAddr);
             const lent = await pool.lentFxrp();
             const receivable = await pool.xrplReceivableFxrp();
             const junior = await pool.juniorAssets();
-            // V6: the fee split feeds the junior buffer on every repayment. It may only ever grow here;
-            // nothing in this walk consumes it (no write-offs against it in pool mode with a solvent book).
-            expect(junior, `junior never shrinks @ ${tag}`).to.be.gte(lastJunior);
+            // V6: the fee split feeds the junior buffer on every repayment; only a write-off may eat it.
+            if (!juniorMayShrink) expect(junior, `junior never shrinks @ ${tag}`).to.be.gte(lastJunior);
             lastJunior = junior;
+            juniorMayShrink = false;
             expect(await pool.totalAssets(), `I2 @ ${tag}`).to.equal(idle + lent + receivable - junior);
 
             // I3 — what the pool says is out equals what the one advance has not yet retired.
@@ -159,32 +171,76 @@ describe("Invariants under a random walk", () => {
             }
             lastPrice = price;
             expectDip = false;
+
+            // I6 — the manager strands nothing: every FXRP it holds is on a named ledger.
+            expect(await fxrp.balanceOf(managerAddr), `I6 @ ${tag}`).to.equal(
+                (await manager.keeperReserveFxrp()) + (await manager.reserveFxrp(accountId))
+            );
         }
 
         await assertInvariants("start");
 
-        for (let step = 0; step < 200; step++) {
+        /** Attest the next month; sometimes refund-heavy, so the covenants fire mid-walk. */
+        async function attestNext(refundCents: number) {
+            const net = 400_000 - refundCents;
+            const start = periodEnd;
+            periodEnd = start + MONTH;
+            await oracle.connect(borrower).submitAttestation(accountId, revenueProof(net, start, periodEnd, refundCents));
+            latestRatioBps = (BigInt(refundCents) * 10_000n) / 400_000n;
+        }
+
+        for (let step = 0; step < 250; step++) {
             const a = await manager.advanceOf(accountId);
             const roll = rng();
             const tag = `step ${step}`;
 
-            if (!a.open && roll < 0.45) {
+            if (!a.open && roll < 0.4) {
                 // Open an advance for a random slice of the limit, if the account is still allowed one.
                 if (a.delinquent) {
                     // Walk ends for this account's borrowing; keep exercising credit instead.
                     await manager.repayFromXrpl(accountId, paymentProof(BigInt(1 + Math.floor(rng() * 20)) * DROPS, accountId));
                     expectDip = false; // pure credit, no retire
+                } else if (latestRatioBps >= freezeBps) {
+                    // The freeze covenant must hold mid-walk: a hot latest month means no new money.
+                    await expect(
+                        manager.connect(borrower).requestAdvance(accountId, 1_000n),
+                        `freeze @ ${tag}`
+                    ).to.be.revertedWithCustomError(manager, "ExcessiveRefunds");
                 } else {
                     const limit = await manager.advanceLimitCents(accountId);
                     const cents = 1n + BigInt(Math.floor(rng() * Number(limit - 1n)));
                     await manager.connect(borrower).requestAdvance(accountId, cents);
+                    await time.increase(3600); // spread originations across velocity epochs
                     // Banked credit may settle part or all of it at origination, off-pool.
                     if ((await manager.creditCents(accountId)) >= 0n) expectDip = true;
                 }
-            } else if (a.open && roll < 0.35) {
+            } else if (!a.open && !a.delinquent && roll < 0.5 && (await manager.reserveFxrp(accountId)) > 0n) {
+                // A closed-clean reserve goes home, straight from manager escrow — the pool untouched.
+                const reserve = await manager.reserveFxrp(accountId);
+                const before = await fxrp.balanceOf(borrower.address);
+                await manager.releaseReserve(accountId);
+                expect((await fxrp.balanceOf(borrower.address)) - before, `release @ ${tag}`).to.equal(reserve);
+            } else if (a.open && roll < 0.3) {
                 // Partial or full FXRP repayment — inflow ≥ retired at $1, so never a dip.
                 const cents = rng() < 0.3 ? a.outstandingCents : 1n + BigInt(Math.floor(rng() * Number(a.outstandingCents)));
                 await manager.connect(borrower).repay(accountId, cents);
+            } else if (a.open && !a.delinquent && roll < 0.42) {
+                // Revenue-share application, checked against a JS mirror of the step-up arithmetic.
+                const latest = await oracle.latestRevenue(accountId);
+                if (latest.periodEnd > a.lastAppliedPeriodEnd) {
+                    let eff = shareBps;
+                    if (latestRatioBps >= warnBps) {
+                        eff = (eff * 3n) / 2n;
+                        if (eff > 10_000n) eff = 10_000n;
+                    }
+                    let expected = (latest.revenueCents * eff) / 10_000n;
+                    if (expected > a.outstandingCents) expected = a.outstandingCents;
+                    await manager.applyRevenueRepayment(accountId);
+                    const after = await manager.advanceOf(accountId);
+                    expect(a.outstandingCents - after.outstandingCents, `share mirror @ ${tag}`).to.equal(expected);
+                } else {
+                    await attestNext(0); // nothing fresh to apply; give it a month to apply next time
+                }
             } else if (a.open && roll < 0.6) {
                 // XRPL repayment, sometimes overpaying — value lands off-pool, a dip is designed in.
                 const owedXrp = Number(a.outstandingCents / 100n) + 1;
@@ -199,12 +255,12 @@ describe("Invariants under a random walk", () => {
                     await time.increase(46 * 24 * 60 * 60);
                     await manager.connect(owner).writeOff(accountId);
                     expectDip = true;
+                    juniorMayShrink = true; // absorbing exactly this is what the buffer is for
                 }
             } else {
-                // A fresh attested period, so the limit stays alive as time moves.
-                const start = periodEnd;
-                periodEnd = start + MONTH;
-                await oracle.connect(borrower).submitAttestation(accountId, revenueProof(400_000, start, periodEnd));
+                // A fresh attested period: mostly clean, sometimes warn-level, sometimes freeze-level.
+                const r = rng();
+                await attestNext(r < 0.7 ? 0 : r < 0.9 ? 8_000 : 10_000);
             }
 
             await assertInvariants(tag);
@@ -218,7 +274,7 @@ describe("Invariants under a random walk", () => {
         // However the walk ended, the books must balance and the pool must still honour withdrawals.
         const idle = await fxrp.balanceOf(poolAddr);
         expect(await pool.totalAssets()).to.equal(
-            idle + (await pool.lentFxrp()) + (await pool.xrplReceivableFxrp())
+            idle + (await pool.lentFxrp()) + (await pool.xrplReceivableFxrp()) - (await pool.juniorAssets())
         );
         const out = await pool.maxWithdraw(lp.address);
         if (out > 0n) await pool.connect(lp).withdraw(out, lp.address, lp.address);

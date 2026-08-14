@@ -1102,7 +1102,15 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         uint256 recovered = reserveFxrp[accountId];
         if (recovered > 0) {
             reserveFxrp[accountId] = 0;
-            if (recovered > lostFxrp) recovered = lostFxrp;
+            if (recovered > lostFxrp) {
+                // The reserve nets against the loss; the remainder is the borrower's own held-back
+                // money, and the debt it was held against is now settled. It goes home, not into
+                // limbo on this contract's balance.
+                address borrower = oracle.accountOwner(accountId);
+                fxrp.safeTransfer(borrower, recovered - lostFxrp);
+                emit ReserveReleased(accountId, borrower, recovered - lostFxrp);
+                recovered = lostFxrp;
+            }
             emit ReserveConsumed(accountId, recovered);
         }
 
@@ -1113,6 +1121,10 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
             }
             uint256 netLost = lostFxrp - recovered;
             if (netLost > 0) pool.onWriteOff(netLost);
+        } else if (recovered > 0) {
+            // Treasury mode: the consumed reserve is the treasury's recovery, and has to be booked
+            // as such or the FXRP sits here unaccounted for.
+            treasuryBalance += recovered;
         }
 
         emit WrittenOff(accountId, lostCents, lostFxrp);

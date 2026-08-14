@@ -154,6 +154,57 @@ describe("The rolling reserve", () => {
         expect(assetsBefore - assetsAfter).to.equal(1_000_000_000n - 100_000_000n);
         expect(await manager.reserveFxrp(accountId)).to.equal(0n);
     });
+
+    it("a reserve larger than the loss nets against it and the surplus goes home", async () => {
+        const { borrower, fxrp, manager, pool, accountId } = await setup({ pool: true });
+        await manager.connect(borrower).requestAdvance(accountId, 100_000n);
+
+        // Repay $1,000 of the $1,050 owed, then rot: the $100 reserve now exceeds the ~$47.6 of
+        // FXRP still out, and the difference is the borrower's money, not the contract's.
+        await manager.connect(borrower).repay(accountId, 100_000n);
+        await time.increase(46 * DAY);
+        await manager.markDelinquent(accountId);
+        await time.increase(91 * DAY);
+
+        const advance = await manager.advanceOf(accountId);
+        const lostFxrp = advance.fxrpDisbursed - (await manager.fxrpRetired(accountId));
+        const reserve = await manager.reserveFxrp(accountId);
+        expect(reserve).to.be.gt(lostFxrp); // the scenario is real, not vacuous
+
+        const borrowerBefore = await fxrp.balanceOf(borrower.address);
+        const assetsBefore = await pool!.totalAssets();
+        await expect(manager.writeOff(accountId)).to.emit(manager, "ReserveReleased");
+
+        // Surplus home, loss fully absorbed by the reserve, the pool whole.
+        expect((await fxrp.balanceOf(borrower.address)) - borrowerBefore).to.equal(reserve - lostFxrp);
+        expect(await pool!.totalAssets()).to.equal(assetsBefore);
+        expect(await manager.reserveFxrp(accountId)).to.equal(0n);
+
+        // And nothing strands: the manager holds exactly the keeper reserve, no orphaned FXRP.
+        expect(await fxrp.balanceOf(await manager.getAddress())).to.equal(await manager.keeperReserveFxrp());
+    });
+
+    it("in treasury mode the consumed reserve is booked, and the books cover the balance", async () => {
+        const { borrower, fxrp, manager, accountId } = await setup();
+        await manager.connect(borrower).requestAdvance(accountId, 100_000n);
+        await manager.connect(borrower).repay(accountId, 100_000n);
+        await time.increase(46 * DAY);
+        await manager.markDelinquent(accountId);
+        await time.increase(91 * DAY);
+
+        // Retirement is pool bookkeeping; in treasury mode the loss is the whole disbursement, so
+        // the entire reserve is consumed and every drop of it must land on the treasury's ledger.
+        const reserve = await manager.reserveFxrp(accountId);
+        const treasuryBefore = await manager.treasuryBalance();
+
+        await manager.writeOff(accountId);
+
+        expect((await manager.treasuryBalance()) - treasuryBefore).to.equal(reserve);
+        // Every FXRP the contract holds is on a ledger: treasury plus keeper reserve, nothing orphaned.
+        expect(await fxrp.balanceOf(await manager.getAddress())).to.equal(
+            (await manager.treasuryBalance()) + (await manager.keeperReserveFxrp())
+        );
+    });
 });
 
 // ---------------------------------------------------------------- A5: the floor curve
