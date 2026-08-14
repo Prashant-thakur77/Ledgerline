@@ -162,6 +162,20 @@ interface Period {
   revenueCents: number;
   periodStart: number;
   periodEnd: number;
+  /** V6: attested refunds inside the window. Absent means zero, so old callers stay valid. */
+  refundCents?: number;
+}
+
+/** Visa's VAMP freeze threshold, in bps of gross — mirrored from AdvanceManager. */
+const REFUND_FREEZE_BPS = 220n;
+
+/** The latest period's refund ratio against gross, the same base the public covenant reads. */
+function refundRatioBps(periods: Period[]): bigint {
+  const latest = periods[periods.length - 1];
+  const refunds = BigInt(latest.refundCents ?? 0);
+  const gross = BigInt(latest.revenueCents) + refunds;
+  if (gross === 0n) return 0n;
+  return (refunds * 10_000n) / gross;
 }
 
 export function registerUnderwrite(framework: Framework): void {
@@ -209,7 +223,8 @@ export function handleComputeLimit(msg: string): HandlerResult {
     if (
       !Number.isInteger(p.revenueCents) || p.revenueCents < 0 ||
       !Number.isInteger(p.periodStart) || !Number.isInteger(p.periodEnd) ||
-      p.periodEnd <= p.periodStart
+      p.periodEnd <= p.periodStart ||
+      (p.refundCents !== undefined && (!Number.isInteger(p.refundCents) || p.refundCents < 0))
     ) {
       return [null, 0, "validating: malformed period"];
     }
@@ -220,6 +235,16 @@ export function handleComputeLimit(msg: string): HandlerResult {
   }
   const createdAt = Number(req.accountCreatedAt ?? 0);
   const cycles = BigInt(Number(req.closedCleanCycles ?? 0));
+
+  /*
+   * The freeze covenant, inside the boundary. The public AdvanceManager refuses originations past
+   * the VAMP freeze ratio; an enclave that skipped the same check would make the private path the
+   * loophole. The refusal names the policy, never the figures.
+   */
+  const ratio = refundRatioBps(req.periods as Period[]);
+  if (ratio >= REFUND_FREEZE_BPS) {
+    return [null, 0, "policy: the latest period's refund ratio exceeds the origination freeze threshold"];
+  }
 
   // 3. Execute — AdvanceManager's arithmetic, verbatim in BigInt.
   const periods = req.periods as Period[];

@@ -95,3 +95,56 @@ describe("UNDERWRITE/COMPUTE_LIMIT", () => {
     expect(JSON.stringify(out)).not.toContain("400000");
   });
 });
+
+describe("the refund covenant, inside the boundary", () => {
+  // The public AdvanceManager freezes originations at Visa's VAMP threshold (2.2% of gross refunded).
+  // The enclave must refuse the same accounts, or the private path becomes the loophole.
+
+  function withRefunds(net: number, refunds: number, startAt = JAN) {
+    return [{ revenueCents: net, periodStart: startAt, periodEnd: startAt + MONTH, refundCents: refunds }];
+  }
+
+  it("refuses an account whose latest period sits past the freeze ratio", () => {
+    // 10,000 / 400,000 of gross = 2.5% — over 2.2%.
+    const [out, status, err] = call({
+      accountId: ACCOUNT,
+      periods: [...months(400_000, 2), ...withRefunds(390_000, 10_000, JAN + 2 * MONTH)],
+      nowTs: NOW,
+    });
+    expect(status).toBe(0);
+    expect(out).toBeNull();
+    expect(err).toMatch(/refund ratio/);
+    // The refusal names the policy, never the figures.
+    expect(err).not.toMatch(/\d/);
+  });
+
+  it("a warn-level month underwrites fine — only the freeze gates origination", () => {
+    // 8,000 / 400,000 = 2% — past the public warn (1.5%), under the freeze (2.2%).
+    const [out, status] = call({
+      accountId: ACCOUNT,
+      periods: [...months(400_000, 2), ...withRefunds(392_000, 8_000, JAN + 2 * MONTH)],
+      nowTs: NOW,
+    });
+    expect(status).toBe(1);
+    expect(out.limitCents).toBeGreaterThan(0);
+  });
+
+  it("only the latest period gates — a hot month, once behind a clean one, no longer freezes", () => {
+    const [, status] = call({
+      accountId: ACCOUNT,
+      periods: [...withRefunds(390_000, 10_000), ...months(400_000, 1, JAN + MONTH)],
+      nowTs: NOW,
+    });
+    expect(status).toBe(1);
+  });
+
+  it("a malformed refundCents is rejected in validation, not silently zeroed", () => {
+    const [, status, err] = call({
+      accountId: ACCOUNT,
+      periods: withRefunds(400_000, -1),
+      nowTs: NOW,
+    });
+    expect(status).toBe(0);
+    expect(err).toMatch(/malformed period/);
+  });
+});
