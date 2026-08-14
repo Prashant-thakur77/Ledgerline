@@ -86,6 +86,17 @@ a 200-step randomised invariant walk. The repository ships verify-claims.ts, whi
 resolves every transaction hash cited in our documentation against Coston2 and fails if
 any claim is not backed.
 
+**Against the bounty's eligible directions**
+
+Proofline is a merchant flow (revenue proven at the processor, advances against it, a live
+settlement splitter), a DeFi integration (ERC-4626 vault, FTSOv2, FAssets), a liquidity
+interface (/app/lend), asset movement UX (FXRP redeemed to real XRP on the XRP Ledger and
+repaid in real XRP, proven back by FDC), a wallet experience (narrated in-wallet
+attestation, wallet rotation), a cross-chain activity dashboard (/app/activity, XRPL
+transactions beside their Flare settlements), and a portfolio view (/app/account). One
+product, built so an interoperable asset does a real job: working capital for businesses
+that can prove their revenue.
+
 **Flare protocols used (all load-bearing)**
 
 FDC Web2Json (revenue in) · FDC Payment (XRPL repayment back) · FTSOv2 (XRP/USD at every
