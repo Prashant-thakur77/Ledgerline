@@ -20,8 +20,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-      - run: yarn install --frozen-lockfile
+      # The lockfile is Yarn Berry's; corepack reads packageManager from package.json so CI
+      # installs with the same yarn generation that wrote the lock.
+      - run: corepack enable
+      - run: yarn install --immutable
       - run: npx hardhat test
 
   extension:
