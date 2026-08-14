@@ -250,3 +250,90 @@ export function demoSource(w: Window, revenueCents: number): SourceConfig {
         ].join(" "),
     };
 }
+
+// ---------------------------------------------------------------- V6 sources
+//
+// The seven-field DTO: net revenue, refunds and disputes attested side by side, so the covenants
+// (refundRatioBps, the warn step-up, the origination freeze) read attested facts rather than trust.
+// NOT used against the live V5 oracle — these exist for the V6 deploy and are exercised by tests.
+
+/** Must stay in step with RevenueOracle.RevenueDTO (V6) — refundCents and disputeCount appended. */
+export const REVENUE_ABI_SIGNATURE_V2 = JSON.stringify({
+    components: [
+        { internalType: "string", name: "platform", type: "string" },
+        { internalType: "string", name: "accountRef", type: "string" },
+        { internalType: "uint256", name: "revenueCents", type: "uint256" },
+        { internalType: "uint256", name: "periodStart", type: "uint256" },
+        { internalType: "uint256", name: "periodEnd", type: "uint256" },
+        { internalType: "uint256", name: "refundCents", type: "uint256" },
+        { internalType: "uint256", name: "disputeCount", type: "uint256" },
+    ],
+    name: "task",
+    type: "tuple",
+});
+
+/**
+ * Stripe balance transactions, reduced to the V6 DTO.
+ *
+ * The same rows as `stripeBalanceSource`, read three ways:
+ *   revenueCents  — net of charges, refunds and adjustments, clamped at zero (as before)
+ *   refundCents   — the refunded money on its own, as a positive number: refund rows carry negative
+ *                   `net`, so the sum is negated; clamped at zero so a reversal-heavy correction
+ *                   month cannot mint a negative
+ *   disputeCount  — how many chargebacks landed, regardless of amount: VAMP counts incidents,
+ *                   because ten small disputes say more about a merchant than one large refund
+ */
+export function stripeBalanceSourceV2(w: Window, apiKey: string): SourceConfig {
+    assertRestricted(apiKey);
+    const inWindow = `select(.currency == "usd") | select(.created >= ${w.periodStart} and .created < ${w.periodEnd})`;
+    return {
+        platform: "stripe",
+        url: "https://api.stripe.com/v1/balance_transactions",
+        httpMethod: "GET",
+        headers: JSON.stringify({ Authorization: `Bearer ${apiKey}` }),
+        queryParams: JSON.stringify({ limit: "100" }),
+        body: "{}",
+        postProcessJq: [
+            `{`,
+            `platform: "stripe",`,
+            `accountRef: "${w.accountRef}",`,
+            `revenueCents: (([.data[]`,
+            `| select(.reporting_category == "charge" or .reporting_category == "refund" or .reporting_category == "adjustment")`,
+            `| ${inWindow}`,
+            `| .net] | add // 0) | if . < 0 then 0 else . end),`,
+            `periodStart: ${w.periodStart},`,
+            `periodEnd: ${w.periodEnd},`,
+            `refundCents: ((0 - ([.data[]`,
+            `| select(.reporting_category == "refund")`,
+            `| ${inWindow}`,
+            `| .net] | add // 0)) | if . < 0 then 0 else . end),`,
+            `disputeCount: ([.data[]`,
+            `| select(.reporting_category == "dispute")`,
+            `| ${inWindow}] | length)`,
+            `}`,
+        ].join(" "),
+    };
+}
+
+/** The keyless stand-in, V6-shaped, so the whole v2 pipeline can be proven without credentials. */
+export function demoSourceV2(w: Window, revenueCents: number, refundCents = 0, disputeCount = 0): SourceConfig {
+    return {
+        platform: "demo",
+        url: "https://swapi.info/api/people/3",
+        httpMethod: "GET",
+        headers: "{}",
+        queryParams: "{}",
+        body: "{}",
+        postProcessJq: [
+            `{`,
+            `platform: "demo",`,
+            `accountRef: "${w.accountRef}",`,
+            `revenueCents: (.height | tonumber | . * 0 + ${revenueCents}),`,
+            `periodStart: ${w.periodStart},`,
+            `periodEnd: ${w.periodEnd},`,
+            `refundCents: ${refundCents},`,
+            `disputeCount: ${disputeCount}`,
+            `}`,
+        ].join(" "),
+    };
+}
