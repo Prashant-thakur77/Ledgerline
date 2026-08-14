@@ -352,6 +352,25 @@ describe("The keeper's tip", () => {
         expect((await fxrp.balanceOf(keeper.address)) - before).to.equal(5_000_000n);
     });
 
+    it("a delinquency pays one tip: re-marking is refused, the reserve cannot be farmed", async () => {
+        const { owner, borrower, keeper, fxrp, manager, accountId } = await setup();
+        await manager.connect(borrower).requestAdvance(accountId, 100_000n);
+
+        // Reserve funded for ten tips; the delinquency is real but singular.
+        await fxrp.mint(owner.address, 50_000_000n);
+        await fxrp.connect(owner).approve(await manager.getAddress(), 50_000_000n);
+        await manager.connect(owner).fundKeeperReserve(50_000_000n);
+        await time.increase(46 * DAY);
+
+        await manager.connect(keeper).markDelinquent(accountId);
+        // Both triggers stay true forever on a marked advance — the guard is the only thing
+        // standing between one delinquency and the whole reserve.
+        await expect(manager.connect(keeper).markDelinquent(accountId)).to.be.revertedWithCustomError(
+            manager, "AccountDelinquent"
+        );
+        expect(await manager.keeperReserveFxrp()).to.equal(45_000_000n); // one tip out, nine intact
+    });
+
     it("an empty reserve degrades the incentive, never the function", async () => {
         const { borrower, keeper, manager, accountId } = await setup();
         await manager.connect(borrower).requestAdvance(accountId, 100_000n);

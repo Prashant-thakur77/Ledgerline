@@ -489,6 +489,10 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
      *
      * Denominated in lots rather than dollars because FAssets redeems whole lots only — 10 XRP on Coston2.
      * The dollar obligation is then computed from what was actually redeemed, at the FTSO rate.
+     *
+     * This leg escrows no rolling reserve: FAssets redeems what it is given, whole lots at a time, and
+     * holding back 10% would break the lot arithmetic the borrower asked for. The write-off simply bears
+     * the full loss on this leg — a smaller-advance, full-exposure trade the borrower opts into.
      */
     function requestAdvanceToXrpl(
         bytes32 accountId,
@@ -1033,6 +1037,10 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     function markDelinquent(bytes32 accountId) external {
         Advance storage advance = _advances[accountId];
         if (!advance.open) revert NoOpenAdvance();
+        // One delinquency, one mark, one tip. Both triggers stay satisfied forever once an advance
+        // is delinquent, so without this guard a keeper could re-mark the same account until the
+        // tip reserve was theirs.
+        if (advance.delinquent) revert AccountDelinquent();
 
         bool wentQuiet = block.timestamp > advance.lastActivityAt + gracePeriod;
         bool termExpired = block.timestamp > advance.openedAt + maxTermSeconds;
