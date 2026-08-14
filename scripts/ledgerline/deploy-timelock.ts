@@ -9,8 +9,8 @@
  */
 import { ethers, run } from "hardhat";
 
-const MANAGER = process.env.MANAGER_ADDRESS ?? "0x24f2c925679e737174103A5F6715b766E3D5D602";
-const POOL = process.env.POOL_ADDRESS ?? "0x38560eE630071846158F639a217E6a0fB2d66Fe2";
+const MANAGER = process.env.MANAGER_ADDRESS ?? "0x1187B737EFef8C1D2563C0001553Bf6E7afe25af";
+const POOL = process.env.POOL_ADDRESS ?? "0x85Ad3AcE968Ca06a8f08C928993e4A4D9a5B8296";
 const DELAY = Number(process.env.TIMELOCK_DELAY ?? 3600);
 
 async function main() {

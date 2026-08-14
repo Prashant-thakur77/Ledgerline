@@ -13,7 +13,7 @@ import { ethers } from "hardhat";
  *   AMOUNT           FXRP to deposit, as a decimal figure (e.g. "10"). Defaults to everything held.
  */
 
-const MANAGER_ADDRESS = process.env.MANAGER_ADDRESS ?? "0xae027AeB3d1FBa24743D1ADE902521641F32f41c";
+const MANAGER_ADDRESS = process.env.MANAGER_ADDRESS ?? "0x1187B737EFef8C1D2563C0001553Bf6E7afe25af";
 const FXRP = "0x0b6A3645c240605887a5532109323A3E12273dc7";
 
 async function main() {
