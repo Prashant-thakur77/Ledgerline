@@ -120,6 +120,15 @@ export const fdcVerificationAbi = [
 
 /** `submitAttestation` takes the proof exactly as the DA layer returns it, re-encoded as the contract's struct. */
 export const submitAttestationAbi = [
+    /* The oracle's refusals, included so a simulation failure decodes to a name we can explain. */
+    { type: "error", name: "InvalidProof", inputs: [] },
+    { type: "error", name: "AccountMismatch", inputs: [{ name: "claimed", type: "bytes32" }, { name: "attested", type: "bytes32" }] },
+    { type: "error", name: "InvalidPeriod", inputs: [] },
+    { type: "error", name: "InvalidPeriodLength", inputs: [{ name: "span", type: "uint64" }, { name: "minSeconds", type: "uint64" }, { name: "maxSeconds", type: "uint64" }] },
+    { type: "error", name: "AttestationAlreadyUsed", inputs: [] },
+    { type: "error", name: "NotAccountOwner", inputs: [{ name: "owner", type: "address" }, { name: "caller", type: "address" }] },
+    { type: "error", name: "StalePeriod", inputs: [{ name: "latestPeriodEnd", type: "uint64" }, { name: "submittedPeriodEnd", type: "uint64" }] },
+    { type: "error", name: "OverlappingPeriod", inputs: [{ name: "latestPeriodEnd", type: "uint64" }, { name: "submittedPeriodStart", type: "uint64" }] },
     {
         type: "function",
         name: "submitAttestation",

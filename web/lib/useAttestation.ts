@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { decodeAbiParameters } from "viem";
-import { usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ORACLE_ADDRESS, EXPLORER, oracleAbi } from "./contracts";
 import {
     CONTRACT_REGISTRY,
@@ -73,6 +73,29 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export function useAttestation() {
     const client = usePublicClient();
     const { writeContractAsync } = useWriteContract();
+    const { address } = useAccount();
+
+    /** The oracle's refusals, in words a person can act on. */
+    function refusal(name?: string): string {
+        switch (name) {
+            case "OverlappingPeriod":
+                return "the oracle refused: this account already proved a period that overlaps this window. A period is a month, and periods cannot overlap, so one account can attest about once a month. For another live run, connect a fresh wallet account";
+            case "StalePeriod":
+                return "the oracle refused: this period ends before the account's latest proven period";
+            case "AttestationAlreadyUsed":
+                return "the oracle refused: this exact attestation was already stored once";
+            case "InvalidPeriodLength":
+                return "the oracle refused: a period must span 26 to 32 days";
+            case "NotAccountOwner":
+                return "the oracle refused: this account is bound to a different wallet";
+            case "AccountMismatch":
+                return "the oracle refused: the attested payload names a different account";
+            case "InvalidProof":
+                return "the oracle refused the Merkle proof";
+            default:
+                return "the oracle refused the store. Nothing was signed, and no failed transaction was sent";
+        }
+    }
 
     const [state, setState] = useState<AttestationState>({ phase: "idle", log: [] });
     const nextId = useRef(0);
@@ -328,6 +351,27 @@ export function useAttestation() {
                     responseBody: { abiEncodedData: decoded.responseBody.abiEncodedData },
                 };
 
+                /*
+                 * Simulate before asking for a signature. If the oracle would refuse (an overlapping
+                 * period, a reused attestation, someone else's account), the refusal surfaces here as a
+                 * named error and the wallet never sees a transaction destined to fail. An earlier
+                 * version skipped this and printed success over a reverted store, which is exactly the
+                 * kind of lie this product exists not to tell.
+                 */
+                try {
+                    await client.simulateContract({
+                        address: ORACLE_ADDRESS,
+                        abi: submitAttestationAbi,
+                        functionName: "submitAttestation",
+                        args: [accountId, { merkleProof: proof.proof as `0x${string}`[], data }],
+                        account: address,
+                    });
+                } catch (simErr) {
+                    const name = (simErr as { cause?: { data?: { errorName?: string } } })?.cause?.data?.errorName
+                        ?? (String(simErr).match(/OverlappingPeriod|StalePeriod|AttestationAlreadyUsed|InvalidPeriodLength|NotAccountOwner|AccountMismatch|InvalidProof/) ?? [])[0];
+                    throw new Error(refusal(name));
+                }
+
                 const storeTx = await writeContractAsync({
                     address: ORACLE_ADDRESS,
                     abi: submitAttestationAbi,
@@ -335,8 +379,13 @@ export function useAttestation() {
                     args: [accountId, { merkleProof: proof.proof as `0x${string}`[], data }],
                 });
                 if (stop()) return;
-                await client.waitForTransactionReceipt({ hash: storeTx });
+                const storeReceipt = await client.waitForTransactionReceipt({ hash: storeTx });
                 if (stop()) return;
+                if (storeReceipt.status !== "success") {
+                    throw new Error(
+                        "the store transaction reverted on chain. The attestation itself is fine; the oracle refused the period. Open the transaction for details"
+                    );
+                }
 
                 setState((s) => ({ ...s, storedTxHash: storeTx, phase: "done" }));
                 say("verified on chain", "proof", { href: `${EXPLORER}/tx/${storeTx}` });
