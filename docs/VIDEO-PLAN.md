@@ -1,28 +1,37 @@
-# The video plan: Chatterbox voiceover + one-take screen
+# The video plan: picture first, audio fitted after
 
-Audio is generated locally (Chatterbox TTS, adam.mp3 voice), so the screen recording has no
-sync pressure: record once while the finished WAV plays in headphones, merge with ffmpeg.
+Workflow: record each shot as its own clip, edit the cut, then hand Claude the actual scene
+durations. The Chatterbox voiceover is generated last, chunk by chunk, sized to the cut
+(about 2.4 words per second), so the audio fits the picture instead of the reverse.
 
-## Flow
-1. Paste the CHUNKS list and loop into voiceover.py (chunks + per-chunk exaggeration/cfg are
-   in the conversation with Claude; also summarized below). Generate, listen, regenerate any
-   single chunk that sounds off.
-2. Tabs in order: /app · / · /docs · /app/activity · /app/lend · /roadmap · /confidential · /security
-3. Wallet unlocked on Coston2, funded; practice the attestation once.
-4. One screen take following the cue sheet; the attestation starts in chunk 2 (~0:35) and has
-   landed by chunk 8 (~3:45).
-5. ffmpeg -i screen.mp4 -i voiceover_final.wav -map 0:v -map 1:a -c:v copy -shortest proofline_demo.mp4
+## Recording rules
+One clip per shot (S1.mp4, S2.mp4, ...). Hold still 1s at the start and 2s at the end of
+every clip as trim handles. Cursor points at what the narration will name, then stops.
+1920x1080, 100% zoom, bookmarks hidden. Record longer than the target; cut down in the edit.
 
-## Cue sheet
-| Chunk | Time | Screen | Voice mood (exaggeration / cfg) |
-|---|---|---|---|
-| 1 open | 0:00 | landing hero to proof card | warm fire (0.65 / 0.35) |
-| 2 go live | 0:30 | app: connect, Yours, Run attestation | confident (0.5 / 0.5) |
-| 3 underwriting | 1:05 | docs, Underwriting section | precise (0.5 / 0.45) |
-| 4 two ledgers | 1:35 | activity: Both ledgers, 115 XRP row | wonder (0.55 / 0.45) |
-| 5 lockbox | 2:10 | lend, then roadmap Phase A cards | proud (0.6 / 0.4) |
-| 6 confidential | 2:45 | confidential evidence table | hushed awe (0.6 / 0.35) |
-| 7 security | 3:20 | security findings lattice | grave (0.45 / 0.4) |
-| 8 landing | 3:45 | back to app: the proven period | rising close (0.7 / 0.3) |
+## Shot list
+| # | Where | Action | Target | Record |
+|---|---|---|---|---|
+| S1 | / | terrain rolls, mouse into it, scroll to proof card | 12s | 25s |
+| S2 | proof card | hover (tilt), rest on green line, click the explorer link, hold | 10s | 20s |
+| S3 | /app | Connect wallet, MetaMask approve, Coston2 visible | 12s | 30s |
+| S4 | /app | toggle Yours, Run an attestation, confirm, console starts | 15s | 40s |
+| S5 | /app console | ONE clip, full ~3 min: rounds, Merkle root, stored, new period lands | 20s cut | full |
+| S6 | /docs | scroll 02 Policy, the underwriting paragraphs | 12s | 25s |
+| S7 | /app/activity | Both ledgers block: pool row, then the 115 XRP treasury row | 12s | 25s |
+| S8 | /app/activity | scroll feed, hover a green attested row | 8s | 20s |
+| S9 | /app/lend | pool figures, scroll to the two disclosures | 10s | 20s |
+| S10 | /roadmap | hero, Phase A cards, hover an inversion, click live evidence, hold | 14s | 30s |
+| S11 | /confidential | hero, evidence table, the $97.91 rows, key-in-enclave row | 15s | 30s |
+| S12 | /security | hero, six findings, hover an inversion | 12s | 25s |
+| S13 | /app | the landed period from S5: figure, green proof line, click through | 10s | 20s |
+| S14 | / | closing hero pass, hold on the headline | 8s | 15s |
 
-If a take fumbles: re-record the screen only; the audio never changes.
+Assembled target: about 3:50 to 4:10. Edit order = table order; S5's landing footage is S13.
+S3, S4, S5 are one wallet session; everything else records in any order. Practice the
+attestation once first; the wallet needs 5 to 10 C2FLR from faucet.flare.network.
+
+## After the cut
+Send Claude the real per-scene durations. The voiceover chunks (with per-chunk emotion
+settings for Chatterbox) get written to those windows and generated as chunk_N.wav files
+that drop onto the timeline scene by scene.
