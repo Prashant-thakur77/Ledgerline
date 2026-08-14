@@ -9,6 +9,9 @@
  * 2. The repayment floor. An account behind its curve is declared, which springs the splitter to
  *    full withholding until it cures. Declaring is permissionless because the shortfall is an
  *    on-chain fact.
+ * 3. Reserve release. A rolling reserve whose advance closed clean, or whose refund window has
+ *    passed, belongs to the borrower — releaseReserve is permissionless and pays them directly,
+ *    so nobody's money sits escrowed a day longer than the policy requires.
  *
  * Candidates come from the explorer's log index (AdvanceIssued), because the contracts deliberately
  * keep no account enumeration and the public RPC caps eth_getLogs at 30 blocks.
@@ -54,6 +57,25 @@ async function main() {
         const tx = await manager.declareFloorBreach(id, { gasLimit: 800_000 });
         const receipt = await tx.wait();
         console.log(`  declared · ${receipt!.hash}`);
+    }
+
+    // Job 3: reserves nobody has claimed. Mirror the contract's predicate exactly, then let the
+    // node's estimate stand guard: a static call catches any race between our read and the send.
+    const now = BigInt((await ethers.provider.getBlock("latest"))!.timestamp);
+    const refundWindow = await manager.refundWindowSeconds();
+    for (const id of accounts) {
+        const reserve = await manager.reserveFxrp(id);
+        if (reserve === 0n) continue;
+        const advance = await manager.advanceOf(id);
+        if (advance.delinquent) continue;
+        const closedClean = !advance.open;
+        const windowPassed = now > BigInt(advance.openedAt) + refundWindow;
+        if (!closedClean && !windowPassed) continue;
+        console.log(`reserve releasable: ${id} · ${ethers.formatUnits(reserve, 6)} FXRP`);
+        await manager.releaseReserve.staticCall(id);
+        const tx = await manager.releaseReserve(id, { gasLimit: 800_000 });
+        const receipt = await tx.wait();
+        console.log(`  released · ${receipt!.hash}`);
     }
 
     console.log("keeper pass complete: nothing else due");
