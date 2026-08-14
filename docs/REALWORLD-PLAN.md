@@ -168,8 +168,10 @@ consumed first on write-off), origination velocity brakes, the keeper tip with
 `delinquencyDue()`, and the guardian pause asymmetry. Deployed as **V5 on 2026-08-13** (addresses
 in the README and on the site) and exercised the same day: the splitter split a live settlement, the
 reserve released on a clean close, and the age haircut is visible in the advance transaction. Still open
-in Phase A: the net-revenue attestation schema (DTO change), reproducible TS build CI, and the Stripe
-read-only App registration.
+in Phase A: only the Stripe read-only App registration (paperwork). The net-revenue schema is BUILT
+(V6 oracle: refunds and disputes attested beside net revenue, `refundRatioBps` on chain, VAMP
+covenants in the manager — warn at 1.5% steps the share rate up by half, 2.2% freezes originations
+until a cleaner month lands) and the reproducible build is enforced in CI.
 
 **Between A and B — the fee split: BUILT (V6, in the repository).** Every repayment's
 pro-rata fee slice now splits at source: 70% senior, 20% auto-replenishing the junior

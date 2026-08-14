@@ -16,7 +16,7 @@ import { AbiCoder } from "ethers";
  * fees paid to fabricate the revenue behind it, and that comparison is only true per month.
  */
 
-const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd)";
+const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd,uint256 refundCents,uint256 disputeCount)";
 const coder = AbiCoder.defaultAbiCoder();
 
 const DAY = 24 * 60 * 60;
@@ -24,7 +24,7 @@ const JAN = 1767225600;
 const REF = "acct_1PeriodLen";
 
 function revenueProof(revenueCents: number, periodStart: number, periodEnd: number) {
-    const abiEncodedData = coder.encode([DTO_TYPE], [["stripe", REF, revenueCents, periodStart, periodEnd]]);
+    const abiEncodedData = coder.encode([DTO_TYPE], [["stripe", REF, revenueCents, periodStart, periodEnd, 0, 0]]);
     return {
         merkleProof: [],
         data: {

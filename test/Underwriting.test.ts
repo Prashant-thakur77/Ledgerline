@@ -12,7 +12,7 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
  * account.
  */
 
-const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd)";
+const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd,uint256 refundCents,uint256 disputeCount)";
 const PROFILE_TYPE = "tuple(string platform,string accountRef,uint256 createdAt)";
 const coder = AbiCoder.defaultAbiCoder();
 
@@ -27,7 +27,7 @@ const REF = "acct_1TierTest";
 function revenueProof(revenueCents: number, periodStart: number, periodEnd: number, accountRef = REF) {
     const abiEncodedData = coder.encode(
         [DTO_TYPE],
-        [["stripe", accountRef, revenueCents, periodStart, periodEnd]]
+        [["stripe", accountRef, revenueCents, periodStart, periodEnd, 0, 0]]
     );
     return {
         merkleProof: [],

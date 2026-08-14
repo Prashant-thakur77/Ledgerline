@@ -12,7 +12,7 @@ import { AbiCoder } from "ethers";
  * nothing about *which* debt it settles.
  */
 
-const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd)";
+const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd,uint256 refundCents,uint256 disputeCount)";
 const coder = AbiCoder.defaultAbiCoder();
 
 const MONTH = 30 * 24 * 60 * 60;
@@ -32,7 +32,7 @@ const OTHER_XRPL_ACCOUNT = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
 function revenueProof(revenueCents: number, index: number) {
     const abiEncodedData = coder.encode(
         [DTO_TYPE],
-        [["stripe", "acct_1TestAbc123", revenueCents, JAN + index * MONTH, JAN + (index + 1) * MONTH]]
+        [["stripe", "acct_1TestAbc123", revenueCents, JAN + index * MONTH, JAN + (index + 1) * MONTH, 0, 0]]
     );
     return {
         merkleProof: [],

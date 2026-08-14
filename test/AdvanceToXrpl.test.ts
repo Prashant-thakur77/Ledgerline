@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { AbiCoder } from "ethers";
 
-const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd)";
+const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd,uint256 refundCents,uint256 disputeCount)";
 const coder = AbiCoder.defaultAbiCoder();
 
 const MONTH = 30 * 24 * 60 * 60;
@@ -19,7 +19,7 @@ const XRPL_ADDRESS = "rpcBsvdaL4eCkK64nNsQB1PQf4hm2Dq3Sc";
 function proofFor(revenueCents: number, index: number) {
     const abiEncodedData = coder.encode(
         [DTO_TYPE],
-        [["stripe", "acct_1TestAbc123", revenueCents, JAN + index * MONTH, JAN + (index + 1) * MONTH]]
+        [["stripe", "acct_1TestAbc123", revenueCents, JAN + index * MONTH, JAN + (index + 1) * MONTH, 0, 0]]
     );
     return {
         merkleProof: [],

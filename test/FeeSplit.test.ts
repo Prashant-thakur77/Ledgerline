@@ -12,7 +12,7 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
  * zeroing both knobs restores V5 exactly.
  */
 
-const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd)";
+const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd,uint256 refundCents,uint256 disputeCount)";
 const coder = AbiCoder.defaultAbiCoder();
 
 const DAY = 24 * 60 * 60;
@@ -22,7 +22,7 @@ const PRICE_DECIMALS = 6;
 const REF = "acct_1FeeSplit";
 
 function revenueProof(revenueCents: number, periodStart: number, periodEnd: number) {
-    const abiEncodedData = coder.encode([DTO_TYPE], [["stripe", REF, revenueCents, periodStart, periodEnd]]);
+    const abiEncodedData = coder.encode([DTO_TYPE], [["stripe", REF, revenueCents, periodStart, periodEnd, 0, 0]]);
     return {
         merkleProof: [],
         data: {

@@ -4,7 +4,7 @@ import { AbiCoder } from "ethers";
 
 // The DTO the jq reduction produces, and which `abiSignature` describes.
 // Keep in sync with RevenueOracle.RevenueDTO and with scripts/ledgerline/revenue-source.ts.
-const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd)";
+const DTO_TYPE = "tuple(string platform,string accountRef,uint256 revenueCents,uint256 periodStart,uint256 periodEnd,uint256 refundCents,uint256 disputeCount)";
 
 const coder = AbiCoder.defaultAbiCoder();
 
@@ -36,7 +36,7 @@ function dto(over: Partial<Dto> = {}): Dto {
 function proofFor(d: Dto) {
     const abiEncodedData = coder.encode(
         [DTO_TYPE],
-        [[d.platform, d.accountRef, d.revenueCents, d.periodStart, d.periodEnd]]
+        [[d.platform, d.accountRef, d.revenueCents, d.periodStart, d.periodEnd, d.refundCents ?? 0, d.disputeCount ?? 0]]
     );
     return {
         merkleProof: [],

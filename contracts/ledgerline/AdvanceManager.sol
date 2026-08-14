@@ -152,6 +152,15 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     uint16 public keeperFeeBps = 1_000; // 10% funds the keeper tips
 
     /**
+     * @notice The refund covenants, with Visa's own VAMP numbers as defaults. The oracle attests
+     * refunds beside net revenue; past the warning ratio the revenue-share rate steps up by half,
+     * and past the freeze ratio the account cannot originate at all until a cleaner period lands.
+     * The same monitoring every acquirer runs, as contract law instead of a risk team.
+     */
+    uint16 public refundWarnBps = 150; // 1.5% of gross: the share rate steps up
+    uint16 public refundFreezeBps = 220; // 2.2% of gross: originations freeze
+
+    /**
      * @notice The write-off pen, held by a named delegate as well as the owner. Maple's lesson:
      * default is a credit judgment entangled with off-chain recovery, so the industry routes it
      * through an accountable named party rather than pure governance. The timelock (owner) can
@@ -290,6 +299,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     event FeeSplitSet(uint16 juniorFeeBps, uint16 keeperFeeBps);
     event FeeSplit(bytes32 indexed accountId, uint256 seniorFxrp, uint256 juniorFxrp, uint256 keeperFxrp);
     event DelegateSet(address delegate);
+    event RefundCovenantsSet(uint16 warnBps, uint16 freezeBps);
     event ReserveTermsSet(uint16 reserveBps, uint64 refundWindowSeconds);
     event VelocitySet(uint32 maxOriginationsPerEpoch);
     event FloorSet(uint16 floorBpsAtHalfTerm);
@@ -336,6 +346,7 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
     error NotGuardianOrOwner();
     error InvalidSplit();
     error NotDelegateOrOwner();
+    error ExcessiveRefunds(uint16 ratioBps, uint16 freezeBps);
 
     constructor(address oracleAddress, address fxrpAddress) Ownable(msg.sender) {
         oracle = RevenueOracle(oracleAddress);
@@ -559,6 +570,12 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
 
         _takeOriginationSlot();
 
+        // The freeze covenant: an account whose latest period refunded past the threshold cannot
+        // originate. Not delinquency, not a mark against history - just no new money until a
+        // cleaner month is proven.
+        uint16 ratio = oracle.refundRatioBps(accountId);
+        if (ratio >= refundFreezeBps) revert ExcessiveRefunds(ratio, refundFreezeBps);
+
         uint256 limit = advanceLimitCents(accountId);
         if (usdCents > limit) revert ExceedsLimit(limit, usdCents);
         uint256 available = availableFunds();
@@ -679,7 +696,17 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         RevenueOracle.RevenueRecord memory latest = oracle.latestRevenue(accountId);
         if (latest.periodEnd <= advance.lastAppliedPeriodEnd) revert PeriodAlreadyApplied();
 
-        uint256 share = (latest.revenueCents * repaymentShareBps) / 10_000;
+        /*
+         * The warning covenant: past the warning ratio the revenue share steps up by half, capped
+         * at the whole period. A refund-heavy month repays faster, which is exactly the direction
+         * an acquirer moves a merchant's reserve when the ratio drifts.
+         */
+        uint256 effectiveShareBps = repaymentShareBps;
+        if (oracle.refundRatioBps(accountId) >= refundWarnBps) {
+            effectiveShareBps = (effectiveShareBps * 3) / 2;
+            if (effectiveShareBps > 10_000) effectiveShareBps = 10_000;
+        }
+        uint256 share = (latest.revenueCents * effectiveShareBps) / 10_000;
         if (share > advance.outstandingCents) share = advance.outstandingCents;
 
         advance.lastAppliedPeriodEnd = latest.periodEnd;
@@ -1202,6 +1229,14 @@ contract AdvanceManager is Ownable, Pausable, ReentrancyGuard {
         juniorFeeBps = newJuniorFeeBps;
         keeperFeeBps = newKeeperFeeBps;
         emit FeeSplitSet(newJuniorFeeBps, newKeeperFeeBps);
+    }
+
+    /// @notice The refund covenant thresholds. Warn must sit below freeze, or the ladder is nonsense.
+    function setRefundCovenants(uint16 newWarnBps, uint16 newFreezeBps) external onlyOwner {
+        if (newWarnBps >= newFreezeBps || newFreezeBps > 10_000) revert InvalidAmount();
+        refundWarnBps = newWarnBps;
+        refundFreezeBps = newFreezeBps;
+        emit RefundCovenantsSet(newWarnBps, newFreezeBps);
     }
 
     /// @notice Name the write-off delegate. Zero address leaves the pen with the owner alone.

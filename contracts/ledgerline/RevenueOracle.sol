@@ -14,12 +14,16 @@ import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerklePr
  */
 contract RevenueOracle {
     /// @notice The shape the jq reduction produces, and which `abiSignature` describes.
+    /// V6 appends the refund fields: the acquiring industry's lesson is that gross revenue is not
+    /// the risk signal — the refund ratio is, and it has to arrive attested like everything else.
     struct RevenueDTO {
         string platform;
         string accountRef;
         uint256 revenueCents;
         uint256 periodStart;
         uint256 periodEnd;
+        uint256 refundCents;
+        uint256 disputeCount;
     }
 
     /**
@@ -43,6 +47,10 @@ contract RevenueOracle {
         /// @notice The Merkle root the proof resolves to — checkable against what the Relay published
         /// for `votingRound`, so anyone can confirm this record independently of us.
         bytes32 merkleRoot;
+        /// @notice Attested refunds inside the same window. Net revenue is what `revenueCents` holds;
+        /// this is the counter-flow, kept so the ratio is computable on chain.
+        uint256 refundCents;
+        uint256 disputeCount;
     }
 
     /// @notice First wallet to prove an account owns it. Only it may attest for that account afterwards.
@@ -167,7 +175,9 @@ contract RevenueOracle {
                 periodEnd: uint64(dto.periodEnd),
                 provenAt: uint64(block.timestamp),
                 votingRound: proof.data.votingRound,
-                merkleRoot: MerkleProof.processProof(proof.merkleProof, keccak256(abi.encode(proof.data)))
+                merkleRoot: MerkleProof.processProof(proof.merkleProof, keccak256(abi.encode(proof.data))),
+                refundCents: dto.refundCents,
+                disputeCount: dto.disputeCount
             })
         );
 
@@ -270,6 +280,20 @@ contract RevenueOracle {
 
     function attestationCount(bytes32 accountId) external view returns (uint256) {
         return _history[accountId].length;
+    }
+
+    /**
+     * @notice The latest period's refund ratio in basis points: refunds over gross (net + refunds).
+     * Visa's VAMP thresholds are quoted against gross volume, so the covenant reads the same base.
+     * Zero when nothing is proven or nothing was refunded.
+     */
+    function refundRatioBps(bytes32 accountId) external view returns (uint16) {
+        RevenueRecord[] storage records = _history[accountId];
+        if (records.length == 0) return 0;
+        RevenueRecord storage latest = records[records.length - 1];
+        uint256 gross = latest.revenueCents + latest.refundCents;
+        if (gross == 0) return 0;
+        return uint16((latest.refundCents * 10_000) / gross);
     }
 
     /// @dev Present so the DTO type lands in the ABI for the off-chain attestation script to encode against.
